@@ -1,7 +1,7 @@
 package ourplayer;
 
-import aic2021.user.UnitController;
-import aic2021.user.UnitInfo;
+import aic2021.user.*;
+import sun.awt.UNIXToolkit;
 
 public class Worker extends MyUnit {
 
@@ -9,28 +9,27 @@ public class Worker extends MyUnit {
         super(uc);
     }
 
-    boolean torchLighted = false;
-    boolean smoke = false;
+    int farms = 0;
+    int sawmills = 0;
+    int quarries = 0;
+
+    Team team = uc.getTeam();
 
     void playRound(){
-        UnitInfo myInfo = uc.getInfo();
-        if (uc.getRound() > 300 + myInfo.getID()%200 && !smoke){
-            if (uc.canMakeSmokeSignal()){
-                uc.makeSmokeSignal(0);
-                smoke = true;
+        moveRandom();
+        if (uc.hasResearched(Technology.JOBS, team)) {
+            if (farms <= 7) {
+                if (spawnRandom(UnitType.FARM)) farms++;
+            }
+
+            if (sawmills <= 7) {
+                if (spawnRandom(UnitType.SAWMILL)) sawmills++;
+            }
+
+            if (quarries <= 7) {
+                if (spawnRandom(UnitType.QUARRY)) quarries++;
             }
         }
-        moveRandom();
-        if (!torchLighted && myInfo.getTorchRounds() <= 0){
-            lightTorch();
-        }
-        myInfo = uc.getInfo();
-        if (myInfo.getTorchRounds() < 70){
-            randomThrow();
-        }
-        int[] signals = uc.readSmokeSignals();
-        if (signals.length > 0){
-            uc.drawPointDebug(uc.getLocation(), 0, 0, 0);
-        }
     }
+
 }
