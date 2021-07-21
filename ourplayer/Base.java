@@ -6,22 +6,55 @@ public class Base extends MyUnit {
 
     int workers = 0;
     Team team = uc.getTeam();
+    Team enemy_team = uc.getOpponent();
 
     Base(UnitController uc){
         super(uc);
     }
 
     void playRound(){
+        playDefense();
+        senseEnemies();
+        senseResources();
         researchTech();
+        if (uc.getRound() == 0)
+            senseTerrain();
+
+        uc.println("energy used: " + uc.getEnergyUsed());
+        uc.println("energy left: " + uc.getEnergyLeft());
+    }
+
+    void playDefense() {
+        // Sense enemy units in attack radius and shoot them (add prioritization algorithm later).
+        UnitInfo[] shootable_enemies = uc.senseUnits(18, enemy_team);
+        for (UnitInfo enemy : shootable_enemies) {
+            if (uc.canAttack()) {
+                uc.attack(enemy.getLocation());
+            }
+        }
+    }
+
+    void senseEnemies() {
+        // Sense enemy units in vision radius and alert team of how many are attacking and what kind.
+        // Prioritize: enemy base -> scouts -> buildings -> wolves -> axemen -> spearmen -> workers -> trappers
+        // UnitInfo[] enemies = uc.senseUnits(enemy_team);
+
+    }
+
+    void senseResources() {
+        // Sense resources in range and alert team of each.
+        ResourceInfo[] nearby_resources = uc.senseResources();
+        for (ResourceInfo resource : nearby_resources) {
+            // Communicate each resource's location, type, and amount via smoke signalling
+        }
     }
 
     void researchTech() {
-        if (uc.getTechLevel(team) == 0) {
+        if (uc.getTechLevel(team) == 0)
             researchTechLevel0();
-        } else {
-            if (workers < 1) {
+        else {
+            if (workers < 1)
                 spawnRandom(UnitType.WORKER);
-            }
 
             if (uc.getTechLevel(team) == 1)
                 researchTechLevel1();
@@ -81,6 +114,12 @@ public class Base extends MyUnit {
             uc.researchTechnology(Technology.HOUSES);
             return;
         }
+    }
+
+    void senseTerrain() {
+        // Sense terrain in range, and maybe let troops know about important spots.
+        Location[] water_tiles = uc.senseWater(50);
+        Location[] mountain_tiles = uc.senseMountains(50);
     }
 
     boolean spawnRandom(UnitType t){
