@@ -138,4 +138,18 @@ public abstract class MyUnit {
 
         return waypoints;
     }
+
+    public boolean goToLocation(Location dest) {
+        if (uc.canMove()) {
+            PriorityQueue<Waypoint> path = ComputePath(dest);
+
+            while (!path.isEmpty()) {
+
+            }
+        }
+
+        return false;
+    }
 }
+
+
