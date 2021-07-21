@@ -13,4 +13,5 @@
 3. `cd` into your git repo and do `git add .`. This will add all modified files in the folder you are in into the staging area.
 4. To make sure your modified files are in the staging area, use `git status`. If you modify a file after it is staged, you will have to re-add it to include the new changes.
 5. Once all of the modified files that you want are in the staging area, do `git commit -m "change I made"`.  
-6. Now you have a version of your project stored in the local repository in your computer. If you want to send all of the commits you saved to the github repoistory, do `git push`.
+6. You can see all of the commits that you and others have made using `git log`. It'll open a vim-like viewer that you can view by using the arrow keys. Type `esc` + `q` to leave.
+7. Now you have a version of your project stored in the local repository in your computer. If you want to send all of the commits you saved to the github repoistory, do `git push`.
