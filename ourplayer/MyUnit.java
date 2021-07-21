@@ -1,5 +1,9 @@
 package ourplayer;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
 import aic2021.user.Direction;
 import aic2021.user.Location;
 import aic2021.user.UnitController;
@@ -11,8 +15,29 @@ public abstract class MyUnit {
 
     UnitController uc;
 
+    Location enemyBaseLocation;
+
+    Map<String, ArrayList<Integer>> memory;
+
+    ArrayList<Location> resources = new ArrayList<>();
+
+    Direction currentDir;
+
+    int roundSpawned;
+
+    int xMax = -1;
+    int xMin = -1;
+    int yMax = -1;
+    int yMin = -1;
+
     MyUnit(UnitController uc){
         this.uc = uc;
+        this.memory = new HashMap<>();
+        this.memory.put("resources", new ArrayList<>());
+        this.memory.put("traps", new ArrayList<>());
+        this.memory.put("mountains", new ArrayList<>());
+        this.memory.put("water", new ArrayList<>());
+        this.memory.put("enemy", new ArrayList<>());
     }
 
     abstract void playRound();
@@ -31,8 +56,9 @@ public abstract class MyUnit {
         int tries = 10;
         while (uc.canMove() && tries-- > 0){
             int random = (int)(uc.getRandomDouble()*8);
-            if (uc.canMove(dirs[random])){
+            if (uc.canMove(dirs[random]) && dirs[random] != this.currentDir){
                 uc.move(dirs[random]);
+                this.currentDir = dirs[random];
                 return true;
             }
         }
