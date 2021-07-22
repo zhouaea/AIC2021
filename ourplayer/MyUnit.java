@@ -6,6 +6,7 @@ import aic2021.user.UnitController;
 import aic2021.user.UnitType;
 
 public abstract class MyUnit {
+    // Have to use constants since enums use static variables.
     final int ENEMY_BASE = 0;
     final int WOOD = 1;
     final int STONE = 2;
@@ -22,6 +23,8 @@ public abstract class MyUnit {
     final int ENEMY_FARM = 13;
     final int ENEMY_SAWMILL = 14;
     final int ENEMY_QUARRY = 15;
+
+    final int teamIdentifier = 74;
 
     Direction[] dirs = Direction.values();
 
@@ -73,8 +76,29 @@ public abstract class MyUnit {
         return false;
     }
 
+    /**
+     * Send a location of interest and its contents.
+     * @param location the location with a point of interest
+     * @param unitCode an integer that corresponds to a unit in the game. See constants in the MyUnit class.
+     * @param unitAmount an integer from 0-15 that signifies how many units there are. If the number is 15, it could
+     *                   mean 15+ of that unit. If number is greater than 100, we will divide the number by 100 to stay
+     *                   within the bit limit.
+     * @return a 32 bit integer with the encoded information.
+     */
     int encodeSmokeSignal(Location location, int unitCode, int unitAmount) {
-        int extra_info = (unitAmount & 511) * 32 + unitCode;
+        // Divide amount by 100 if unit is a resource.
+        if (unitCode >= WOOD && unitCode <= FOOD) {
+            unitAmount /= 100;
+        }
+
+        // Unit amount cannot pass 15.
+        if (unitAmount > 15) {
+            unitAmount = 15;
+        }
+
+        // Shift teamIdentifier 9 spaces, and shift unitAmount 5 spaces.
+        int extra_info = teamIdentifier * 512 + (unitAmount & 511) * 32 + unitCode;
+        // Shift extra info (teamIdentifier + unitAmount + unitCode) 16 spaces.
         int message = extra_info * 128 * 128 + encodeLocation(location);
 
         uc.println("Encoding Energy Used: " + uc.getEnergyUsed());
@@ -90,11 +114,38 @@ public abstract class MyUnit {
         return message;
     }
 
+    /**
+     * Decode a smoke signal.
+     * @param currentLocation the location of the decoding unit
+     * @param codedMessage 32 bit integer that came from the smoke signal
+     * @return The contents of the message if we are 99% sure the message came from our team. Otherwise, null.
+     */
     DecodedMessage decodeSmokeSignal(Location currentLocation, int codedMessage) {
-        int unitCode = 31 & (codedMessage / 128 / 128); // unitCode is bits 16 - 20
-        int unitAmount = codedMessage / 128 / 128 / 32; // unitAmount is bits 21-31
         Location location = decodeLocation(currentLocation, codedMessage);
-        DecodedMessage decodedMessage = new DecodedMessage(location, unitCode, unitAmount);
+
+        // unitCode is bits 16 - 20
+        codedMessage = codedMessage / 128 / 128;
+        int unitCode = 31 & codedMessage;
+
+        // unitAmount is bits 21-24
+        codedMessage = codedMessage / 32;
+        int unitAmount = 15 & codedMessage;
+
+        // identifier is bits 25-31
+        codedMessage = codedMessage / 16;
+        int identifier = codedMessage;
+
+        // Only decode message if we are 99% certain that the message is ours.
+        DecodedMessage decodedMessage;
+        if (identifier == teamIdentifier) {
+            // Convert resource amount from 4 bit version to real amount.
+            if (unitCode >= WOOD && unitCode <= FOOD) {
+                 unitAmount *= 100;
+             }
+             decodedMessage = new DecodedMessage(location, unitCode, unitAmount);
+        } else {
+             decodedMessage = null;
+        }
 
         uc.println("Decoding Energy Used: " + uc.getEnergyUsed());
         return decodedMessage;

@@ -12,7 +12,7 @@ public class Base extends MyUnit {
     }
 
     void playRound(){
-        decodeSmokeSignals();
+        baseDecodeSmokeSignals();
         if (workers < 1){
             if (spawnRandom(UnitType.WORKER)) ++workers;
         }
@@ -23,10 +23,14 @@ public class Base extends MyUnit {
         }
     }
 
-    void decodeSmokeSignals() {
+    void baseDecodeSmokeSignals() {
         int[] smokeSignals = uc.readSmokeSignals();
+        DecodedMessage decodedSmokeSignal;
         for (int smokeSignal : smokeSignals) {
-            uc.println(decodeSmokeSignal(uc.getLocation(), smokeSignal));
+            // Make sure message is from our team.
+            if ((decodedSmokeSignal = decodeSmokeSignal(uc.getLocation(), smokeSignal)) != null) {
+                uc.println(decodedSmokeSignal);
+            }
         }
     }
 

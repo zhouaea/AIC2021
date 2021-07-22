@@ -22,7 +22,7 @@ public class Worker extends MyUnit {
         if (uc.canMakeSmokeSignal()) {
             Location location = uc.getLocation();
             uc.println("Worker location: " + location);
-            uc.makeSmokeSignal(encodeSmokeSignal(location, 2, 2000));
+            uc.makeSmokeSignal(encodeSmokeSignal(location, 0, 1));
         }
 
         moveRandom();
