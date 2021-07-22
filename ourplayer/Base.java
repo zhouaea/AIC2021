@@ -12,8 +12,21 @@ public class Base extends MyUnit {
     }
 
     void playRound(){
-        if (workers < 5){
+        decodeSmokeSignals();
+        if (workers < 1){
             if (spawnRandom(UnitType.WORKER)) ++workers;
+        }
+
+        if(uc.getRound() == 100) {
+            uc.println("base location:" + uc.getLocation());
+            uc.killSelf();
+        }
+    }
+
+    void decodeSmokeSignals() {
+        int[] smokeSignals = uc.readSmokeSignals();
+        for (int smokeSignal : smokeSignals) {
+            uc.println(decodeLocation(uc.getLocation(), smokeSignal));
         }
     }
 

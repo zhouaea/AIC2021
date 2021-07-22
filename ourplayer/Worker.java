@@ -1,5 +1,6 @@
 package ourplayer;
 
+import aic2021.user.Location;
 import aic2021.user.UnitController;
 import aic2021.user.UnitInfo;
 
@@ -13,24 +14,16 @@ public class Worker extends MyUnit {
     boolean smoke = false;
 
     void playRound(){
-        UnitInfo myInfo = uc.getInfo();
-        if (uc.getRound() > 300 + myInfo.getID()%200 && !smoke){
-            if (uc.canMakeSmokeSignal()){
-                uc.makeSmokeSignal(0);
-                smoke = true;
-            }
+        if (uc.canLightTorch()) {
+            uc.lightTorch();
+            uc.println("torch lit");
         }
+
+        if (uc.canMakeSmokeSignal()) {
+            Location location = uc.getLocation();
+            uc.makeSmokeSignal(encodeLocation(location));
+        }
+
         moveRandom();
-        if (!torchLighted && myInfo.getTorchRounds() <= 0){
-            lightTorch();
-        }
-        myInfo = uc.getInfo();
-        if (myInfo.getTorchRounds() < 70){
-            randomThrow();
-        }
-        int[] signals = uc.readSmokeSignals();
-        if (signals.length > 0){
-            uc.drawPointDebug(uc.getLocation(), 0, 0, 0);
-        }
     }
 }
