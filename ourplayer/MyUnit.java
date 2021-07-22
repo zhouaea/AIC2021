@@ -5,9 +5,7 @@ import aic2021.user.Location;
 import aic2021.user.UnitController;
 import aic2021.user.UnitType;
 
-import java.util.Comparator;
-import java.util.PriorityQueue;
-import java.util.ArrayList;
+import java.util.*;
 
 class FComparator implements Comparator<Waypoint> {
     public int compare(Waypoint w1, Waypoint w2) {
@@ -140,15 +138,40 @@ public abstract class MyUnit {
     }
 
     public boolean goToLocation(Location dest) {
-        if (uc.canMove()) {
+        int retries = 3;
+
+        while(!uc.getLocation().isEqual(dest) && retries > 0) {
+            retries--;
+
+            if (!uc.canSenseLocation(dest)) {
+                Location[] localArea = uc.getVisibleLocations();
+
+                Location closest = null;
+                for (Location loc : localArea) {
+                    if (closest == null) {
+                        closest = loc;
+                    }
+
+                    if (loc.distanceSquared(dest) < closest.distanceSquared(dest) && uc.isAccessible(loc)) {
+                        closest = loc;
+                    }
+                }
+
+                dest = closest;
+            }
+
             PriorityQueue<Waypoint> path = ComputePath(dest);
 
-            while (!path.isEmpty()) {
-
+            for (Waypoint w : path) {
+                if (uc.canMove()) {
+                    uc.move(uc.getLocation().directionTo(w.loc));
+                }
             }
+
+            System.out.println(uc.getEnergyLeft());
         }
 
-        return false;
+        return retries > 0;
     }
 }
 

@@ -1,5 +1,6 @@
 package ourplayer;
 
+import aic2021.user.Location;
 import aic2021.user.UnitController;
 
 public class Explorer extends MyUnit {
@@ -9,7 +10,8 @@ public class Explorer extends MyUnit {
     }
 
     void playRound(){
-
+        Location testLocation = new Location(313, 310);
+        goToLocation(testLocation);
     }
 
 }
