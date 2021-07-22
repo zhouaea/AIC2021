@@ -26,7 +26,7 @@ public class Base extends MyUnit {
     void decodeSmokeSignals() {
         int[] smokeSignals = uc.readSmokeSignals();
         for (int smokeSignal : smokeSignals) {
-            uc.println(decodeLocation(uc.getLocation(), smokeSignal));
+            uc.println(decodeSmokeSignal(uc.getLocation(), smokeSignal));
         }
     }
 
