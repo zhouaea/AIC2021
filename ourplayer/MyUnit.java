@@ -6,8 +6,10 @@ import java.util.Map;
 
 import aic2021.user.Direction;
 import aic2021.user.Location;
+import aic2021.user.Resource;
 import aic2021.user.UnitController;
 import aic2021.user.UnitType;
+import jdk.management.resource.ResourceType;
 
 public abstract class MyUnit {
     // Have to use constants since enums use static variables.
@@ -210,5 +212,22 @@ public abstract class MyUnit {
         }
 
         return actual_location;
+    }
+
+    /**
+     * Converts a Resource to its integer representation
+     * @param type
+     * @return
+     */
+    int resourceTypeToInt(Resource type) {
+        if (type == Resource.WOOD) {
+            return 1;
+        } else if (type == Resource.STONE) {
+            return 2;
+        } else if (type == Resource.FOOD) {
+            return 3;
+        } else {
+            throw new IllegalArgumentException("Invalid resource type");
+        }
     }
 }

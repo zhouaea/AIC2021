@@ -63,22 +63,24 @@ public class Explorer extends MyUnit {
       this.visited.remove(0);
     }
 
-    if (this.findBase()) {
-      this.sentryMode = true;
-      this.baseFound = true;
-//      this.uc.println("base found");
+    if (!this.baseFound) {
+      if (this.findBase()) {
+        this.sentryMode = true;
+        this.baseFound = true;
+      }
     }
 
     // look for resources
     this.findResources();
 
+    // if resources are found, send out the first one and then remove it from the list
     if (this.resources.size() > 0) {
       // send smoke signal for resource location, preferably optimize (only the top 3 locations
       // based on distance/amount)
-      if (uc.canMakeSmokeSignal()) {
-        Location location = this.resources.get(0);
-//        uc.println("Resource location: " + location);
-        uc.makeSmokeSignal(encodeSmokeSignal(location, 0, 1));
+      if (this.uc.canMakeSmokeSignal()) {
+        Location location = this.resources.remove(0);
+        ResourceInfo[] info = this.uc.senseResourceInfo(location);
+        this.uc.makeSmokeSignal(encodeSmokeSignal(location, this.resourceTypeToInt(info[0].getResourceType()), info.length));
       }
     }
   }
@@ -224,12 +226,12 @@ public class Explorer extends MyUnit {
 
   // ignores low resource stores (less than 50)
   void findResources() {
-    for (ResourceInfo info : this.uc.senseResources(this.uc.getInfo().getType().getVisionRange(), null)) {
+    for (ResourceInfo info :
+        this.uc.senseResources(this.uc.getInfo().getType().getVisionRange(), null)) {
       if (this.uc.isAccessible(info.getLocation())
           && info.amount > 50
           && !this.resources.contains(info.getLocation())) {
         this.resources.add(info.getLocation());
-//        this.uc.println("resources found at " + info.getLocation());
       }
     }
   }
