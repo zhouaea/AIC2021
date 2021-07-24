@@ -1,7 +1,6 @@
 package ourplayer;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import aic2021.user.Direction;
 import aic2021.user.Location;
@@ -18,6 +17,7 @@ public class Explorer extends MyUnit {
 
   boolean torchLit = false;
   boolean sentryMode = false;
+  boolean baseFound = false;
   ArrayList<Location> visited = new ArrayList<>();
 
   /*
@@ -41,28 +41,69 @@ public class Explorer extends MyUnit {
 
   void playRound() {
 
-    // communicate resource locations (by smoke signals or rock art)
-
     // light torch
     if (!torchLit && this.uc.getInfo().getTorchRounds() <= 0) {
       lightTorch();
     }
 
-    if (!this.sentryMode) {
-      //            this.betterMove();
-      //            this.betterMove2();
-      this.betterMove3();
+    if (this.baseFound) {
+      if (!this.enemyReaction() && !this.sentryMode) {
+        //            this.betterMove();
+        //            this.betterMove2();
+        this.betterMove3();
+      }
+    } else {
+      if (!this.sentryMode) {
+        this.betterMove3();
+      }
     }
 
+    // clean up visited memory
     if (this.visited.size() > 50) {
       this.visited.remove(0);
     }
 
     if (this.findBase()) {
       this.sentryMode = true;
+      this.baseFound = true;
+//      this.uc.println("base found");
     }
 
+    // look for resources
     this.findResources();
+
+    if (this.resources.size() > 0) {
+      // send smoke signal for resource location, preferably optimize (only the top 3 locations
+      // based on distance/amount)
+      if (uc.canMakeSmokeSignal()) {
+        Location location = this.resources.get(0);
+//        uc.println("Resource location: " + location);
+        uc.makeSmokeSignal(encodeSmokeSignal(location, 0, 1));
+      }
+    }
+  }
+
+  /** @return true if there are dangerous enemies, false otherwise */
+  boolean enemyReaction() {
+    UnitInfo thisInfo = this.uc.getInfo();
+    UnitInfo[] enemies =
+        this.uc.senseUnits(thisInfo.getType().getVisionRange(), this.uc.getOpponent());
+    for (UnitInfo info : enemies) {
+      // if the enemies are hostile
+      if (info.getAttack() > 0) {
+        this.sentryMode = false;
+        this.runAway(this.uc.getLocation().directionTo(info.getLocation()));
+        break;
+      }
+    }
+    return enemies.length != 0;
+  }
+
+  void runAway(Direction enemy) {
+    Direction optimal = enemy.opposite();
+    this.currentDir = optimal;
+    this.visited.clear();
+    this.betterMove3();
   }
 
   // moves to the tile farthest from all the previously visited ones
@@ -142,7 +183,8 @@ public class Explorer extends MyUnit {
 
   // determines the direction that will bring the explorer farthest from all previous tiles
   Direction optimalDirection() {
-    Direction go = Direction.NORTH;
+    Direction go = this.currentDir;
+    //    Direction go = Direction.NORTH;
     double score = 0;
     double tempScore = 0;
     Location targetLoc;
@@ -182,13 +224,12 @@ public class Explorer extends MyUnit {
 
   // ignores low resource stores (less than 50)
   void findResources() {
-    for (ResourceInfo info : this.uc.senseResources()) {
-      ArrayList<Location> locs = new ArrayList<>(Arrays.asList(this.uc.getVisibleLocations(true)));
-      if (locs.contains(info.getLocation())
-          && this.uc.isAccessible(info.getLocation())
+    for (ResourceInfo info : this.uc.senseResources(this.uc.getInfo().getType().getVisionRange(), null)) {
+      if (this.uc.isAccessible(info.getLocation())
           && info.amount > 50
           && !this.resources.contains(info.getLocation())) {
         this.resources.add(info.getLocation());
+//        this.uc.println("resources found at " + info.getLocation());
       }
     }
   }
