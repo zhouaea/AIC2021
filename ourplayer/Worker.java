@@ -11,9 +11,21 @@ public class Worker extends MyUnit {
     }
 
     Team team = uc.getTeam();
+    Team deerTeam = Team.NEUTRAL;
 
-    ArrayList<Location> broadcasted_locations;
-    ArrayList<Location> found_locations;
+    ArrayList<ResourceInfo> found_locations;
+
+    int currentResourceLocationIndex;
+
+    boolean isMining = false;
+
+    boolean isHunting = false;
+    Location currentDeerLocation;
+
+    boolean isDepositing = false;
+    boolean knowsPlaceToDeposit = false;
+    Location depositLocation;
+
 
     int torch_rounds = 0;
 
@@ -22,101 +34,153 @@ public class Worker extends MyUnit {
     int quarries = 0;
 
     void playRound(){
-        // If just created, remember base location.
+        // If just created, store team's base location.
+        if (!knowsPlaceToDeposit) {
+            rememberBaseLocation();
+        }
+
         senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first priority.
         decodeMessages(); // get locations of resources from other units
-        senseResources();
-        lightTorch();
-        gatherResources(); // movement options
+        senseResources(); // check local area and hunt a deer or add/remove resource locations to/from memory
+        keepTorchLit();
+
+        // Hunting takes precedence over depositing (can kill deer on the way).
+        if (isHunting)
+            hunt();
+        else if (isDepositing)
+            deposit();
+        else if (isMining)
+            mine();
+        else
+            moveToResource(); // movement options
+
         spawnBuildings(); // once jobs is unlocked, spawn 20 buildings max
 
         torch_rounds--;
+    }
+
+    void rememberBaseLocation() {
+        UnitInfo[] surroundingUnits = uc.senseUnits(team);
+        for (UnitInfo unit : surroundingUnits) {
+            if (unit.getType() == UnitType.BASE) {
+                depositLocation = unit.getLocation();
+            }
+        }
+
+        knowsPlaceToDeposit = true;
     }
 
     void senseEnemies() {
 
     }
 
-    void senseResources() {
-        // UnitInfo[] deer = uc.senseUnits(neutral_team);
+    void decodeMessages() {
+
     }
 
-    void decodeMessages() {}
+    void senseResources() {
+        // Look at resources in vision radius, if the current resource should be in sight (assuming unit is holding a torch) and it is not sensed, remove it.
+        ResourceInfo[] resources = uc.senseResources();
+        if (currentResourceLocationIndex > -1)
+            if (uc.canSenseLocation(found_locations.get(currentResourceLocationIndex).location))
+                uc.println(uc.senseResourceInfo(found_locations.get(currentResourceLocationIndex).location));
+                if (uc.senseResourceInfo(found_locations.get(currentResourceLocationIndex).location) == null)
+                    found_locations.remove(currentResourceLocationIndex);
 
-    void lightTorch() {
+        // If the found resources haven't been added yet, add them to the list.
+        for (ResourceInfo resource : resources) {
+            if (!found_locations.contains(resource))
+                found_locations.add(resource);
+        }
+
+        // If deer is found, engage in hunting mode and kill the nearest one in sight.
+        UnitInfo[] deer = uc.senseUnits(deerTeam);
+
+        if (deer != null) {
+            currentDeerLocation = deer[0].getLocation();
+            isHunting = true;
+        } else {
+            isHunting = false; // Deer was killed
+        }
+    }
+
+    void keepTorchLit() {
         // Relight torch if possible after half of torch is burned.
         if (uc.canLightTorch() ) {
+            uc.throwTorch(uc.);
             uc.lightTorch();
             torch_rounds = 75;
         }
     }
 
-    void gatherResources() {
-        // If next to base, deposit any resources collected. Light a torch as well.
+    void deposit() {
+        bug2(baseLocation);
         if (uc.canDeposit()) {
             uc.deposit();
+            isDepositing = false;
+        }
+    }
+
+    void hunt() {
+        if (uc.canAttack(currentDeerLocation)) {
+            uc.attack(currentDeerLocation);
         }
 
-        // If on resource, collect it, and send a smoke signal on found resources in the area.
+        goToLocation(currentDeerLocation);
+
+        if (uc.canAttack(currentDeerLocation)) {
+            uc.attack(currentDeerLocation);
+        }
+    }
+
+    void moveToResource() {
+        // Location already set.
+        if (currentResourceLocationIndex > -1) {
+            bug2(found_locations.get(currentResourceLocationIndex).location);
+            return;
+        }
+
+        // If no resource locations stored, just explore.
+        if (found_locations.isEmpty()) {
+            explore();
+            return;
+        }
+
+        // If the list of found locations is not empty, set target location to the first one in the list.
+        currentResourceLocationIndex = 0;
+    }
+
+    void mine() {
+        // TODO If on resource, collect it, and send a smoke signal on found resources in the area.
         // Alternatively, send a smoke signal on a location where the resources are depleted.
         // Only send if there are enough resources to sit for 10 turns?
+
+        // For now, if they fill up on one resource, workers go back to base.
         if (uc.canGatherResources()) {
             uc.gatherResources();
-            // send_signal()
-        }
+        // If the unit can't get resources because there are no more left, the location is no longer valid, so remove it
+        // from the list of found locations and as the currentLocation being travelled to.
+        } else if (max(uc.getResourcesCarried()) < GameConstants.MAX_RESOURCE_CAPACITY ||
+                (max(uc.getResourcesCarried()) < GameConstants.MAX_RESOURCE_CAPACITY_BOXES && uc.hasResearched(Technology.BOXES, team))) {
+                found_locations.remove(currentResourceLocationIndex);
 
-        Location resource_location;
-
-        // If carrying enough resources, pathfind to base and deposit resource.
-        if (passesResourceThreshold()) {
-            //pathfind(base_location)
+            currentResourceLocationIndex = -1;
+        // If the unit can't get resources because it is at its carrying capacity, deposit resources at base.
+        } else {
+            isMining = false;
+            isDepositing = true;
         }
-        // If resource is in vision, move towards it. If this location hasn't been broadcasted, store it as found.
-        else if ((resource_location = scanForResources()) != null) {
-            //pathfind(resource_location)
-        }
-        // If looking for resources and none in sight, pathfind to the closest resource communicated or found earlier.
-        else if (broadcasted_locations.size() != 0) {
-            //pathfind(broadcasted_locations.get(0))
-        }
-        else if (found_locations.size() != 0) {
-            //pathfind(found_locations.get(0))
-        }
-        // If no broadcasted or recently found locations, and no resources in sight, explore.
-        else
-            //explore();
-
     }
 
-    boolean passesResourceThreshold() {
-        // For now, if they fill up on one resource, workers go back to base.
-        for (int resource_count : uc.getResourcesCarried()) {
-            if (resource_count == 100)
-                return true;
+    private int max(int[] array) {
+        int max = 0;
+        for (int i : array) {
+            if (i > max)
+                max = i;
         }
-        return false;
+
+        return max;
     }
-
-    // Returns location with most resources in vision radius, if any. If none, return null.
-    Location scanForResources() {
-        ResourceInfo[] sensed_resources = uc.senseResources();
-
-        if (sensed_resources.length == 0) {
-            return null;
-        }
-
-        int max_resource = 0;
-        Location resource_location = null;
-        for (ResourceInfo resource: sensed_resources) {
-            if (resource.amount > max_resource) {
-                max_resource = resource.amount;
-                resource_location = resource.location;
-            }
-        }
-
-        return resource_location;
-    }
-
 
     void spawnBuildings() {
         if (uc.hasResearched(Technology.JOBS, team)) {
@@ -133,5 +197,4 @@ public class Worker extends MyUnit {
             }
         }
     }
-
 }
