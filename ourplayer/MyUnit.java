@@ -145,6 +145,15 @@ public abstract class MyUnit {
         }
     }
 
+    public int computeH(Location start, Location end) {
+        int dx = Math.abs(start.x - end.x);
+        int dy = Math.abs(start.y - end.y);
+        int D = 1;
+        double D2 = 1.414;
+
+        return (int)(D * (dx + dy) + (D2 - 2 * D) * Math.min(dx, dy));
+    }
+
     /**
      * computeAStar uses the AStar algorithm to generate the shortest feasible
      * path to a location.
@@ -152,6 +161,7 @@ public abstract class MyUnit {
      * @return A list of waypoints.
      */
     public ArrayList<Waypoint> computeAStar(Location dest) {
+        int energyStart = uc.getEnergyUsed();
         Heap openList = new Heap(2500);
         HashSet<Waypoint> closedList = new HashSet<>();
         ArrayList<Waypoint> waypoints = new ArrayList<>();
@@ -171,6 +181,9 @@ public abstract class MyUnit {
                 }
                 Collections.reverse(waypoints);
 
+                int energyEnd = uc.getEnergyUsed() - energyStart;
+                System.out.println(energyEnd);
+
                 return waypoints;
             }
 
@@ -180,10 +193,10 @@ public abstract class MyUnit {
                     continue;
                 }
 
-                int movCost = currentWaypoint.gCost + currentWaypoint.loc.distanceSquared(neighbor.loc);
+                int movCost = currentWaypoint.gCost + computeH(currentWaypoint.loc, neighbor.loc);
                 if (movCost < neighbor.gCost || !openList.heapContains(neighbor)) {
                     neighbor.gCost = movCost;
-                    neighbor.hCost = neighbor.loc.distanceSquared(dest);
+                    neighbor.hCost = computeH(neighbor.loc, dest);
                     neighbor.parent = currentWaypoint;
 
                     if (!openList.heapContains(neighbor)) {
@@ -209,7 +222,7 @@ public abstract class MyUnit {
 
         estimate = dest;
 
-        if (!uc.canSenseLocation(dest)) {
+        if (!uc.canSenseLocation(dest) || !uc.isAccessible(dest)) {
             estimate = computeEstimate(dest);
 
             if (!uc.isAccessible(estimate)) {
@@ -231,11 +244,14 @@ public abstract class MyUnit {
      * It updates the target destination and provides an initial path.
      * @param dest This is the destination the unit is expected to travel to.
      */
-    public void goToLocation(Location dest) {
+    public boolean goToLocation(Location dest) {
         if (!dest.isEqual(currentDestination)) {
             currentDestination = dest;
             currentPath = getPath(dest);
+            return false;
         }
+
+        return uc.getLocation().isEqual(dest);
     }
 
     /**
