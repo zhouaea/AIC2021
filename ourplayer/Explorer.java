@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import aic2021.user.Direction;
 import aic2021.user.Location;
+import aic2021.user.Resource;
 import aic2021.user.ResourceInfo;
 import aic2021.user.UnitController;
 import aic2021.user.UnitInfo;
@@ -21,34 +22,9 @@ public class Explorer extends MyUnit {
   boolean baseFound = false;
   ArrayList<Location> visited = new ArrayList<>();
 
-  /*
-  Bait
-  BalancedStrats
-  Basic1
-  Basic2
-  Basic3
-  Basic4
-  HairyDiscord
-  HappyClown
-  ILoveAIC
-  Resourceful
-  TestIvanFilter
-  TooBigForTheMeta
-  TowerOfGod
-  UnworthyTrees
-  WhoNeedsAMap
-  YetAnotherBasicMap
-   */
-
   void playRound() {
 
-    if (this.uc.getRound() == 2000) {
-      this.uc.println("Num resources found: " + this.resources.size());
-      for (Location l : this.resources) {
-        this.uc.println(l);
-      }
-    }
-
+    // try to send enemy base location smoke signal
     if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
       int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
       this.uc.makeSmokeSignal(signal);
@@ -57,11 +33,23 @@ public class Explorer extends MyUnit {
       this.sentSignal = true;
     }
 
+    if (this.nuevoResources.get(WOOD).size() > 0) {
+//      this.uc.println("Resource at: " + this.newResources.remove(0));
+
+      if (this.uc.canMakeSmokeSignal()) {
+        int signal = encodeSmokeSignal(this.nuevoResources.get(WOOD).remove(0).getLocation(), WOOD, 1);
+        this.uc.makeSmokeSignal(signal);
+        this.uc.println(
+                "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+      }
+    }
+
     // light torch
     if (!torchLit && this.uc.getInfo().getTorchRounds() <= 0) {
       lightTorch();
     }
 
+    // handles movement
     if (this.baseFound) {
       if (!this.enemyReaction() && !this.sentryMode) {
         //            this.betterMove();
@@ -79,6 +67,7 @@ public class Explorer extends MyUnit {
       this.visited.remove(0);
     }
 
+    // did it find the base?
     if (!this.baseFound) {
       if (this.findBase()) {
         this.sentryMode = true;
@@ -88,20 +77,7 @@ public class Explorer extends MyUnit {
     }
 
     // look for resources
-    this.findResources();
-
-    // if resources are found, send out the first one and then remove it from the list
-    //    if (this.resources.size() > 0) {
-    //      // send smoke signal for resource location, preferably optimize (only the top 3
-    // locations
-    //      // based on distance/amount)
-    //      if (this.uc.canMakeSmokeSignal()) {
-    //        Location location = this.resources.remove(0);
-    //        ResourceInfo[] info = this.uc.senseResourceInfo(location);
-    //        this.uc.makeSmokeSignal(encodeSmokeSignal(location,
-    // this.resourceTypeToInt(info[0].getResourceType()), info.length));
-    //      }
-    //    }
+    this.findResources2();
   }
 
   /** @return true if there are dangerous enemies, false otherwise */
@@ -243,13 +219,42 @@ public class Explorer extends MyUnit {
     return false;
   }
 
+  boolean findResources2() {
+    for (ResourceInfo info : this.uc.senseResources()) {
+      Location l = info.getLocation();
+      if (info.amount > 50 && !this.alreadySeenResourceCheck(l)) {
+        if (info.resourceType == Resource.WOOD) {
+          this.nuevoResources.get(WOOD).add(info);
+        } else if (info.resourceType == Resource.STONE) {
+          this.nuevoResources.get(STONE).add(info);
+        } else {
+          this.nuevoResources.get(FOOD).add(info);
+        }
+        this.seenResources.add(l);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  boolean alreadySeenResourceCheck(Location l) {
+    for (Integer i : this.nuevoResources.keySet()) {
+      for (ResourceInfo info : this.nuevoResources.get(i)) {
+        if (l.isEqual(info.getLocation())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   // ignores low resource stores (less than 50)
   void findResources() {
     for (ResourceInfo info : this.uc.senseResources()) {
       if (this.uc.isAccessible(info.getLocation())
           && info.amount > 50
-          && !this.resources.contains(info.getLocation())) {
-        this.resources.add(info.getLocation());
+          && !this.seenResources.contains(info.getLocation())) {
+        this.newResources.add(info.getLocation());
       }
     }
   }

@@ -9,6 +9,7 @@ import java.util.Map;
 import aic2021.user.Direction;
 import aic2021.user.Location;
 import aic2021.user.Resource;
+import aic2021.user.ResourceInfo;
 import aic2021.user.UnitController;
 import aic2021.user.UnitType;
 
@@ -39,19 +40,26 @@ public abstract class MyUnit {
 
     Location enemyBaseLocation;
 
-    ArrayList<Location> resources = new ArrayList<>();
+    Map<Integer, ArrayList<ResourceInfo>> nuevoResources = new HashMap<>();
+
+    ArrayList<Location> newResources = new ArrayList<>();
+
+    ArrayList<Location> seenResources = new ArrayList<>();
 
     Direction currentDir;
 
     int roundSpawned;
 
-    int xMax = -1;
-    int xMin = -1;
-    int yMax = -1;
-    int yMin = -1;
+//    int xMax = -1;
+//    int xMin = -1;
+//    int yMax = -1;
+//    int yMin = -1;
 
     MyUnit(UnitController uc){
         this.uc = uc;
+        this.nuevoResources.put(WOOD, new ArrayList<>());
+        this.nuevoResources.put(STONE, new ArrayList<>());
+        this.nuevoResources.put(FOOD, new ArrayList<>());
     }
 
     abstract void playRound();

@@ -43,7 +43,7 @@ public class Worker extends MyUnit {
     if (this.uc.canReadSmokeSignals()) {
       int[] signals = this.uc.readSmokeSignals();
       if (signals.length > 0) {
-        this.uc.println("Received signals: " + signals[0]);
+        this.uc.println("Worker received " + signals.length + " signals: First signal is: " + signals[0]);
       }
     }
 

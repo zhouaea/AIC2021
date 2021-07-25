@@ -23,6 +23,13 @@ public class Base extends MyUnit {
         if (axemen < 1){
             if (spawnRandom(UnitType.AXEMAN)) ++axemen;
         }
+
+        if (this.uc.canReadSmokeSignals()) {
+            int[] signals = this.uc.readSmokeSignals();
+            if (signals.length > 0) {
+                this.uc.println("Base received " + signals.length + " signals: First signal is: " + signals[0]);
+            }
+        }
     }
 
 }
