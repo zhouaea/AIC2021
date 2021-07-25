@@ -15,6 +15,7 @@ public class Explorer extends MyUnit {
     super(uc);
   }
 
+  boolean sentSignal = false;
   boolean torchLit = false;
   boolean sentryMode = false;
   boolean baseFound = false;
@@ -40,6 +41,21 @@ public class Explorer extends MyUnit {
    */
 
   void playRound() {
+
+    if (this.uc.getRound() == 2000) {
+      this.uc.println("Num resources found: " + this.resources.size());
+      for (Location l : this.resources) {
+        this.uc.println(l);
+      }
+    }
+
+    if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
+      int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
+      this.uc.makeSmokeSignal(signal);
+      this.uc.println(
+          "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+      this.sentSignal = true;
+    }
 
     // light torch
     if (!torchLit && this.uc.getInfo().getTorchRounds() <= 0) {
@@ -67,6 +83,7 @@ public class Explorer extends MyUnit {
       if (this.findBase()) {
         this.sentryMode = true;
         this.baseFound = true;
+        this.uc.println("Enemy base found at " + this.enemyBaseLocation);
       }
     }
 
@@ -74,15 +91,17 @@ public class Explorer extends MyUnit {
     this.findResources();
 
     // if resources are found, send out the first one and then remove it from the list
-    if (this.resources.size() > 0) {
-      // send smoke signal for resource location, preferably optimize (only the top 3 locations
-      // based on distance/amount)
-      if (this.uc.canMakeSmokeSignal()) {
-        Location location = this.resources.remove(0);
-        ResourceInfo[] info = this.uc.senseResourceInfo(location);
-        this.uc.makeSmokeSignal(encodeSmokeSignal(location, this.resourceTypeToInt(info[0].getResourceType()), info.length));
-      }
-    }
+    //    if (this.resources.size() > 0) {
+    //      // send smoke signal for resource location, preferably optimize (only the top 3
+    // locations
+    //      // based on distance/amount)
+    //      if (this.uc.canMakeSmokeSignal()) {
+    //        Location location = this.resources.remove(0);
+    //        ResourceInfo[] info = this.uc.senseResourceInfo(location);
+    //        this.uc.makeSmokeSignal(encodeSmokeSignal(location,
+    // this.resourceTypeToInt(info[0].getResourceType()), info.length));
+    //      }
+    //    }
   }
 
   /** @return true if there are dangerous enemies, false otherwise */
@@ -226,8 +245,7 @@ public class Explorer extends MyUnit {
 
   // ignores low resource stores (less than 50)
   void findResources() {
-    for (ResourceInfo info :
-        this.uc.senseResources(this.uc.getInfo().getType().getVisionRange(), null)) {
+    for (ResourceInfo info : this.uc.senseResources()) {
       if (this.uc.isAccessible(info.getLocation())
           && info.amount > 50
           && !this.resources.contains(info.getLocation())) {
