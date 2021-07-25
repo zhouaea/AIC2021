@@ -15,17 +15,35 @@ public class Axeman extends MyUnit {
     ArrayList<UnitInfo> foes = new ArrayList<>();
     private boolean fighting = false;
     private int distToEnemy = 0;
+    private int distanceCounter = 0;
+    Location baseLocation = null;
 
     public void fight() {
-        Location target = foes.get(0).getLocation();
+        if (foes.isEmpty()) {
+            retreat();
+        } else {
+            Location target = foes.get(0).getLocation();
+            int newDistance = uc.getLocation().distanceSquared(target);
+            if (distToEnemy == 0)
+                distToEnemy = newDistance;
 
-        goToLocation(target);
+            goToLocation(target);
 
-        if (uc.canAttack(target) && uc.canSenseLocation(target) && uc.senseUnitAtLocation(target) != null) {
-            if (foes.get(0).getHealth() <= uc.getInfo().getAttack()) {
-                foes.remove(0);
+            if (uc.canAttack(target) && uc.canSenseLocation(target) && uc.senseUnitAtLocation(target) != null) {
+                if (foes.get(0).getHealth() <= uc.getInfo().getAttack()) {
+                    foes.remove(0);
+                    distanceCounter = 0;
+                    distToEnemy = 0;
+                }
+                uc.attack(target);
             }
-            uc.attack(target);
+
+            if (newDistance >= distToEnemy)
+                distanceCounter++;
+
+            if (distanceCounter == 8) {
+                retreat();
+            }
         }
     }
 
@@ -34,7 +52,8 @@ public class Axeman extends MyUnit {
     }
 
     public void retreat() {
-
+        fighting = false;
+        goToLocation(baseLocation.add(uc.getLocation().directionTo(baseLocation).opposite()));
     }
 
     public void DetectUnits() {
@@ -58,12 +77,28 @@ public class Axeman extends MyUnit {
 
         if (enemyHealth / friendlyAP < friendlyHealth / enemyAP) {
             fighting = true;
-            fight();
+        }
+    }
+
+    void rememberBaseLocation() {
+        UnitInfo[] surroundingUnits = uc.senseUnits(uc.getInfo().getTeam());
+        for (UnitInfo unit : surroundingUnits) {
+            if (unit.getType() == UnitType.BASE) {
+                baseLocation = unit.getLocation();
+            }
         }
     }
 
     void playRound(){
         lightTorch();
+        if (baseLocation == null)
+            rememberBaseLocation();
+
+        if (!fighting)
+            DetectUnits();
+        else
+            fight();
+
         FollowPath();
     }
 
