@@ -255,6 +255,16 @@ public abstract class MyUnit {
             }
         }
 
+        if (uc.senseUnitAtLocation(estimate) != null) {
+            for (Direction dir : dirs) {
+                Location alternative = estimate.add(dir);
+                if (uc.canSenseLocation(alternative) && uc.isAccessible(alternative) && uc.senseUnitAtLocation(alternative) == null) {
+                    estimate = alternative;
+                    break;
+                }
+            }
+        }
+
         return computeAStar(estimate);
     }
 
