@@ -110,6 +110,24 @@ public abstract class MyUnit {
         return false;
     }
 
+    public Location lastResortEstimate(Location dest) {
+        Location[] visibleTiles = uc.getVisibleLocations(true);
+
+        Location closest = null;
+        for (Location tile : visibleTiles) {
+            if (closest == null) {
+                closest = tile;
+                continue;
+            }
+
+            if (computeH(tile, dest) < computeH(closest, dest) && uc.isAccessible(tile) && !tile.isEqual(uc.getLocation())) {
+                closest = tile;
+            }
+        }
+
+        return closest;
+    }
+
     /**
      * computeEstimate provides an alternative location if the original is
      * undetectable. It arrives at coordinate by finding the intersections of
@@ -230,9 +248,10 @@ public abstract class MyUnit {
                     Location neighbor = estimate.add(dir);
                     if (uc.canSenseLocation(neighbor) && uc.isAccessible(neighbor)) {
                         estimate = neighbor;
-                        break;
+                        return computeAStar(estimate);
                     }
                 }
+                estimate = lastResortEstimate(dest);
             }
         }
 
