@@ -10,6 +10,7 @@ import aic2021.user.UnitType;
 public class Base extends MyUnit {
 
     int explorers = 0;
+    int workers = 0;
 
     Team team = this.uc.getTeam();
     Team enemy_team = this.uc.getOpponent();
@@ -23,6 +24,9 @@ public class Base extends MyUnit {
     void playRound(){
         if (this.explorers < 1){
             if (spawnRandom(UnitType.EXPLORER)) ++this.explorers;
+        }
+        if (this.workers < 1){
+            if (spawnRandom(UnitType.WORKER)) ++this.workers;
         }
 
         // read and record smoke signals

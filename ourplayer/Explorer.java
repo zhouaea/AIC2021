@@ -18,7 +18,7 @@ public class Explorer extends MyUnit {
 
   int visitedID = 71920;
 
-      ArrayList<Location> visited = new ArrayList<>();
+  //  ArrayList<Location> visited = new ArrayList<>();
 
   Direction currentDir;
 
@@ -50,13 +50,15 @@ public class Explorer extends MyUnit {
       this.sentSignal = true;
     }
 
-    // try to send resource location smoke signal
-    if (this.newResources.size() > 0) {
-      if (this.uc.canMakeSmokeSignal()) {
-        int signal = this.encodeResourceMessage(this.newResources.remove(0));
-        this.uc.makeSmokeSignal(signal);
-        this.uc.println(
-            "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+    // try to send resource location smoke signal (at most every 30 rounds)
+    if (this.uc.getRound() % 30 == 0) {
+      if (this.newResources.size() > 0) {
+        if (this.uc.canMakeSmokeSignal()) {
+          int signal = this.encodeResourceMessage(this.newResources.remove(0));
+          this.uc.makeSmokeSignal(signal);
+          this.uc.println(
+              "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+        }
       }
     }
 
@@ -66,38 +68,34 @@ public class Explorer extends MyUnit {
     this.uc.println("Energy used before moving: " + this.uc.getEnergyUsed());
 
     // handles movement
-    //    if (this.baseFound) {
-    //      if (!this.enemyReaction() && !this.sentryMode) {
-    //        this.betterMove3();
-    //      }
-    //    } else {
-    //      if (!this.sentryMode) {
-    //        this.betterMove3();
-    //      }
-    //    }
     if (!this.enemyReaction()) {
       this.betterMove3();
     }
 
     this.uc.println("Energy used after moving: " + this.uc.getEnergyUsed());
 
-//     clean up visited memory
-            if (this.visited.size() > 30) {
-                this.visited.remove(0);
-            }
+    //     clean up visited memory
+    //    if (this.visited.size() > 30) {
+    //      this.visited.remove(0);
+    //    }
+
+    this.uc.println("Energy used after clearing memory: " + this.uc.getEnergyUsed());
 
     // did it find the base?
     if (!this.baseFound) {
       if (this.findBase()) {
-        //        this.sentryMode = true;
         this.baseFound = true;
         this.calculateDangerZone();
         this.uc.println("Enemy base found at " + this.enemyBaseLocation);
       }
     }
 
+    this.uc.println("Energy used after finding base: " + this.uc.getEnergyUsed());
+
     // look for resources
     this.findResources();
+
+    this.uc.println("Energy used after finding resources: " + this.uc.getEnergyUsed());
   }
 
   void betterMove3() {
@@ -109,12 +107,14 @@ public class Explorer extends MyUnit {
       if (this.uc.canMove(this.currentDir)
           && this.validLocationCheck(this.uc.getLocation().add(this.currentDir))) {
         this.uc.move(this.currentDir);
-                        this.visited.add(this.uc.getLocation());
-        // rock art to mark visited locations
-//        if (this.uc.canDraw(this.visitedID)) {
-//          this.uc.draw(this.visitedID);
-          //          this.uc.println("Rock art drawn: " + this.visitedID);
-//        }
+        // record new visited location
+        //        this.visited.add(this.uc.getLocation());
+
+        // mark location with rock art
+        if (this.uc.canDraw(this.visitedID)) {
+          this.uc.draw(this.visitedID);
+          this.uc.println("Rock art drawn: " + this.visitedID);
+        }
         return;
       } else {
         double randomTurn = this.uc.getRandomDouble();
@@ -144,11 +144,10 @@ public class Explorer extends MyUnit {
   // determines the direction that will bring the explorer farthest from all previous tiles
   Direction optimalDirection() {
     Direction go = this.currentDir;
-    //    Direction go = Direction.NORTH;
     double score = 0;
     double tempScore = 0;
     Location targetLoc;
-//    ArrayList<Location> visited = this.findVisitedLocations();
+    ArrayList<Location> visited = this.findVisitedLocations();
     for (Direction dir : Direction.values()) {
       targetLoc = this.uc.getLocation().add(dir);
       for (Location l : visited) {
@@ -173,33 +172,9 @@ public class Explorer extends MyUnit {
     return visited;
   }
 
-  //    boolean alreadySeenCheck() {
-  //        Location considering = this.uc.getLocation().add(this.currentDir);
-  //        for (Location temp : this.visited) {
-  //            if (considering.isEqual(temp)) {
-  //                return true;
-  //            }
-  //        }
-  //        return false;
-  //    }
-
-//  boolean validLocationCheck(Location l) {
-//    if (this.uc.canRead(l)) {
-//      if (this.uc.read(l) == this.visitedID) {
-//        return false;
-//      }
-//    }
-//    for (Location loc : this.dangerZone) {
-//      if (l.isEqual(loc)) {
-//        return false;
-//      }
-//    }
-//    return true;
-//  }
-
   boolean validLocationCheck(Location l) {
-    for (Location location : this.visited) {
-      if (l.isEqual(location)) {
+    if (this.uc.canRead(l)) {
+      if (this.uc.read(l) == this.visitedID) {
         return false;
       }
     }
@@ -211,14 +186,19 @@ public class Explorer extends MyUnit {
     return true;
   }
 
-  boolean notDangerousCheck(Location l) {
-    for (Location loc : this.dangerZone) {
-      if (l.isEqual(loc)) {
-        return false;
-      }
-    }
-    return true;
-  }
+  //  boolean validLocationCheck(Location l) {
+  //    for (Location location : this.visited) {
+  //      if (l.isEqual(location)) {
+  //        return false;
+  //      }
+  //    }
+  //    for (Location loc : this.dangerZone) {
+  //      if (l.isEqual(loc)) {
+  //        return false;
+  //      }
+  //    }
+  //    return true;
+  //  }
 
   boolean findBase() {
     for (UnitInfo info : this.uc.senseUnits(this.uc.getOpponent())) {
@@ -267,10 +247,13 @@ public class Explorer extends MyUnit {
   }
 
   void runAway(Direction enemy) {
-    Direction optimal = enemy.opposite();
-    this.currentDir = optimal;
-        this.visited.clear();
-//    this.visitedID++;
+    if (this.baseFound) {
+      this.uc.println("running away");
+      Direction optimal = enemy.opposite();
+      this.currentDir = optimal;
+//      this.visited.clear();
+      this.visitedID++;
+    }
     this.betterMove3();
   }
 
