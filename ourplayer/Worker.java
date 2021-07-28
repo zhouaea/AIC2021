@@ -39,21 +39,33 @@ public class Worker extends MyUnit {
         }
 
         senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first priority.
+        uc.println(uc.getEnergyLeft());
         decodeResourceMessages(); // get locations of resources from other units
+        uc.println(uc.getEnergyLeft());
         senseResources(); // check local area for deer to hunt or add/remove resource locations to/from memory
+        uc.println(uc.getEnergyLeft());
         keepTorchLit();
+        uc.println(uc.getEnergyLeft());
 
         // Hunting takes precedence over depositing (can kill deer on the way).
-        if (isHunting)
+        if (isHunting) {
             hunt();
-        else if (isDepositing)
+            uc.println("hunt");
+        } else if (isDepositing) {
             deposit();
-        else if (isMining)
+            uc.println("deposit");
+        } else if (isMining) {
             mine();
-        else
+            uc.println("mine");
+        } else {
             moveToResource(); // movement options
+            uc.println("movetoresource");
+        }
+
+        uc.println(uc.getEnergyLeft());
 
         spawnBuildings(); // once jobs is unlocked, spawn 20 buildings max
+        uc.println(uc.getEnergyLeft());
     }
 
     void rememberBaseLocation() {
@@ -87,7 +99,6 @@ public class Worker extends MyUnit {
                 else if (message.unitCode == FOOD)
                     found_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
         }
-        uc.println("decode" + uc.getEnergyLeft());
     }
 
     void senseResources() {
@@ -129,7 +140,6 @@ public class Worker extends MyUnit {
         } else {
             isHunting = false; // Deer was killed
         }
-        uc.println("Sense" + uc.getEnergyLeft());
     }
 
     // When torch is almost finished, throw it on an adjacent square and light another torch with it.
@@ -141,7 +151,7 @@ public class Worker extends MyUnit {
                 uc.lightTorch();
         }
         // After initial torch light, throw torch on ground and light a new one when the torch is almost depleted.
-       else if (torchRounds <= 1) {
+       else if (torchRounds <= 5) {
             if (dropTorch())
                 if (uc.canLightTorch()) {
                     uc.lightTorch();
@@ -149,7 +159,6 @@ public class Worker extends MyUnit {
                 else
                     uc.println("SOMEHOW TORCH CAN NOT BE LIT");
         }
-        uc.println("Torch" + uc.getEnergyLeft());
     }
 
     private boolean dropTorch() {
@@ -208,7 +217,6 @@ public class Worker extends MyUnit {
     }
 
     void deposit() {
-        uc.println("Deposit Before" + uc.getEnergyLeft());
         followPath();
         if (uc.canDeposit()) {
             if (uc.hasResearched(Technology.MILITARY_TRAINING, team))
@@ -218,15 +226,15 @@ public class Worker extends MyUnit {
             uc.deposit();
             isDepositing = false;
         }
-        uc.println("Deposit After" + uc.getEnergyLeft());
     }
 
     private boolean checkForBarrack() {
         UnitInfo[] unitsNearby = uc.senseUnits();
         for (UnitInfo unit : unitsNearby) {
-            if (unit.getTeam() == team)
-                  if (unit.getType() == UnitType.BARRACKS)
-                      return true;
+            if (unit.getTeam() == team) {
+                if (unit.getType() == UnitType.BARRACKS)
+                    return true;
+            }
         }
 
         return false;
@@ -242,8 +250,6 @@ public class Worker extends MyUnit {
         if (uc.canAttack(currentDeerLocation)) {
             uc.attack(currentDeerLocation);
         }
-
-        uc.println("Hunting" + uc.getEnergyLeft());
     }
 
     void mine() {
@@ -254,11 +260,13 @@ public class Worker extends MyUnit {
             int maxResourceAmountAtLocation = max((uc.senseResourceInfo(uc.getLocation())));
 
             // If the unit can sit on the resource for 10 turns, send a smoke signal about a location it has seen.
-            if ((maxResourceAmountAtLocation >= 100 && !uc.hasResearched(Technology.BOXES, team)) || (maxResourceAmountAtLocation >= 200 && uc.hasResearched(Technology.BOXES, team)))
-                if (!messagesToSend.isEmpty())
+            if ((maxResourceAmountAtLocation >= 100 && !uc.hasResearched(Technology.BOXES, team)) || (maxResourceAmountAtLocation >= 200 && uc.hasResearched(Technology.BOXES, team))) {
+                if (!messagesToSend.isEmpty()) {
                     if (uc.canMakeSmokeSignal())
                         // right now we just send with FIFO principle.
                         uc.makeSmokeSignal(encodeResourceMessage(messagesToSend.remove(0)));
+                }
+            }
 
             uc.gatherResources();
         // If the unit can't get resources because there are no more left, the location is no longer valid, so remove it
@@ -274,8 +282,6 @@ public class Worker extends MyUnit {
             isDepositing = true;
             goToLocation(depositLocation);
         }
-
-        uc.println("Mining" + uc.getEnergyLeft());
     }
 
     private int max(ResourceInfo[] array) {
@@ -302,6 +308,11 @@ public class Worker extends MyUnit {
         // Location is already set, so just pathfind to it.
         if (currentFoundResourceIndex > -1) {
             followPath();
+            uc.println("current location: " + uc.getLocation());
+            uc.println("destination: " + found_resources.get(currentFoundResourceIndex).location);
+            uc.println("current location is equal to destination: " + uc.getLocation().isEqual(found_resources.get(currentFoundResourceIndex).location));
+            if (uc.getLocation().isEqual(found_resources.get(currentFoundResourceIndex).location))
+                isMining = true;
             return;
         }
 
@@ -316,7 +327,6 @@ public class Worker extends MyUnit {
         // in the resource_list.
         currentFoundResourceIndex = 0;
         goToLocation(found_resources.get(currentFoundResourceIndex).location);
-        uc.println("MoveToResource" + uc.getEnergyLeft());
     }
 
 
@@ -334,7 +344,5 @@ public class Worker extends MyUnit {
                 if (spawnRandom(UnitType.QUARRY)) quarries++;
             }
         }
-
-        uc.println("Spawn Buildings" + uc.getEnergyLeft());
     }
 }
