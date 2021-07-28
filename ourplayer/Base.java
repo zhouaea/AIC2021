@@ -12,7 +12,7 @@ public class Base extends MyUnit {
     }
 
     void playRound(){
-        if (workers < 5){
+        if (workers < 1){
             if (spawnRandom(UnitType.WORKER)) ++workers;
         }
     }

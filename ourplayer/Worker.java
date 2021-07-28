@@ -1,7 +1,6 @@
 package ourplayer;
 
-import aic2021.user.UnitController;
-import aic2021.user.UnitInfo;
+import aic2021.user.*;
 
 public class Worker extends MyUnit {
 
@@ -9,28 +8,17 @@ public class Worker extends MyUnit {
         super(uc);
     }
 
-    boolean torchLighted = false;
-    boolean smoke = false;
+    boolean travelledToEnemyBase = false;
 
-    void playRound(){
-        UnitInfo myInfo = uc.getInfo();
-        if (uc.getRound() > 300 + myInfo.getID()%200 && !smoke){
-            if (uc.canMakeSmokeSignal()){
-                uc.makeSmokeSignal(0);
-                smoke = true;
-            }
+    void playRound() {
+        if (!travelledToEnemyBase) {
+            if (bug2(uc.getLocation(), enemyBase))
+                travelledToEnemyBase = true;
         }
-        moveRandom();
-        if (!torchLighted && myInfo.getTorchRounds() <= 0){
-            lightTorch();
+        else {
+            if (bug2(uc.getLocation(), teamBase))
+                return;
         }
-        myInfo = uc.getInfo();
-        if (myInfo.getTorchRounds() < 70){
-            randomThrow();
-        }
-        int[] signals = uc.readSmokeSignals();
-        if (signals.length > 0){
-            uc.drawPointDebug(uc.getLocation(), 0, 0, 0);
-        }
+        uc.println(uc.getEnergyLeft());
     }
 }
