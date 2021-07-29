@@ -1,4 +1,3 @@
-// TODO some workers may kill themselves for some reason...
 package ourplayer;
 
 import aic2021.engine.Unit;

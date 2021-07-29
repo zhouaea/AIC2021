@@ -26,11 +26,7 @@ public class UnitPlayer {
 		while (true) {
 			// If the target resource location can be sensed, but another worker is on the resource besides oneself,
 			// remove the resource from the list of found locations to prioritize a different target
-			try {
-				u.playRound();
-			} catch (Exception e) {
-				uc.println(e);
-			}
+			u.playRound();
 			uc.yield();
 		}
 	}
