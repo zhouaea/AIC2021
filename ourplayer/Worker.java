@@ -107,6 +107,7 @@ public class Worker extends MyUnit {
         // a new target needs to be found.
         if (currentFoundResourceIndex > -1) {
             Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
+            uc.println(locationHasNoResources(currentResourceLocation));
             if (locationHasNoResources(currentResourceLocation)) {
                 found_resources.remove(currentFoundResourceIndex);
                 currentFoundResourceIndex = -1;
@@ -117,7 +118,7 @@ public class Worker extends MyUnit {
         // resources, save it as a message to send.
         ResourceInfo[] resources = uc.senseResources();
         for (ResourceInfo resource : resources) {
-            if (!found_resources.contains(resource)) {
+            if (!alreadyRecordedResource(resource)) {
                 found_resources.add(resource);
 
                 if (resource.amount > 200) {
@@ -135,16 +136,30 @@ public class Worker extends MyUnit {
     boolean locationHasNoResources(Location resourceLocation) {
         if (uc.canSenseLocation(resourceLocation)) {
             ResourceInfo[] resourcesAtLocation = uc.senseResourceInfo(resourceLocation);
+            uc.println(resourcesAtLocation.length);
             for (ResourceInfo resource : resourcesAtLocation) {
                 // Resource exists.
-                if (resource != null)
+                if (resource != null) {
                     return false;
+                }
             }
-            uc.println("resources do not exist");
             return true;
         }
 
         return false;
+    }
+
+    private boolean alreadyRecordedResource(ResourceInfo resource) {
+        for (ResourceInfo info : this.found_resources) {
+            if (info.resourceType == resource.resourceType && sameLocation(info.location, resource.location)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean sameLocation(Location loc1, Location loc2) {
+        return loc1.x == loc2.x && loc1.y == loc2.y;
     }
 
     /**
