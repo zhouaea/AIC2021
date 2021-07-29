@@ -105,16 +105,9 @@ public class Worker extends MyUnit {
         if (currentFoundResourceIndex > -1) {
             Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
 
-            // If the target resource location can be sensed and has no resources, a new target needs to be found.
-            if (locationHasNoResources(currentResourceLocation)) {
-                found_resources.remove(currentFoundResourceIndex);
-                currentFoundResourceIndex = -1;
-                closestLocation = null; // Reset pathfinding manually after worker changes target.
-            }
-
-            // If the target resource location can be sensed, but another worker is on the resource besides oneself,
-            // remove the resource from the list of found locations to prioritize a different target.
-            if (locationHasAnotherWorker(currentResourceLocation)) {
+            // If the target resource location can be sensed and has no resources or another worker is currently
+            // on the resource, a new target needs to be found.
+            if (locationHasNoResources(currentResourceLocation) || locationHasAnotherWorker(currentResourceLocation)) {
                 found_resources.remove(currentFoundResourceIndex);
                 currentFoundResourceIndex = -1;
                 closestLocation = null; // Reset pathfinding manually after worker changes target.
@@ -143,7 +136,6 @@ public class Worker extends MyUnit {
     boolean locationHasNoResources(Location resourceLocation) {
         if (uc.canSenseLocation(resourceLocation)) {
             ResourceInfo[] resourcesAtLocation = uc.senseResourceInfo(resourceLocation);
-            uc.println(resourcesAtLocation.length);
             for (ResourceInfo resource : resourcesAtLocation) {
                 // Resource exists.
                 if (resource != null) {
@@ -403,7 +395,6 @@ public class Worker extends MyUnit {
         return max;
     }
 
-    // TODO worker circles around food dropped by deer instead of pathfinding there.
     void moveToResource() {
         // Location is already set, so just pathfind to it.
         if (currentFoundResourceIndex > -1) {

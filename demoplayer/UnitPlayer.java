@@ -24,7 +24,13 @@ public class UnitPlayer {
 		else u = new Sawmill(uc);
 
 		while (true) {
-			u.playRound();
+			// If the target resource location can be sensed, but another worker is on the resource besides oneself,
+			// remove the resource from the list of found locations to prioritize a different target
+			try {
+				u.playRound();
+			} catch (Exception e) {
+				uc.println(e);
+			}
 			uc.yield();
 		}
 	}
