@@ -13,12 +13,9 @@ public class Explorer extends MyUnit {
 
   boolean initDirSet = false;
   boolean sentSignal = false;
-  //  boolean torchLit = false;
   boolean baseFound = false;
 
   int visitedID = 71920;
-
-  //  ArrayList<Location> visited = new ArrayList<>();
 
   Direction currentDir;
 
