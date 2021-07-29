@@ -1,10 +1,9 @@
-// TODO How do we know which location workers are mining?
-// TODO How do we prevent duplicate found locatins?
+// TODO some workers may kill themselves for some reason...
 package ourplayer;
 
 import aic2021.engine.Unit;
 import aic2021.user.*;
-import java.util.ArrayList; // TODO switch to priority queue later
+import java.util.ArrayList;
 
 public class Worker extends MyUnit {
 
@@ -110,6 +109,7 @@ public class Worker extends MyUnit {
             if (locationHasNoResources(currentResourceLocation)) {
                 found_resources.remove(currentFoundResourceIndex);
                 currentFoundResourceIndex = -1;
+                closestLocation = null; // Reset pathfinding manually after worker changes target.
             }
 
             // If the target resource location can be sensed, but another worker is on the resource besides oneself,
@@ -117,6 +117,7 @@ public class Worker extends MyUnit {
             if (locationHasAnotherWorker(currentResourceLocation)) {
                 found_resources.remove(currentFoundResourceIndex);
                 currentFoundResourceIndex = -1;
+                closestLocation = null; // Reset pathfinding manually after worker changes target.
             }
         }
 
@@ -191,7 +192,10 @@ public class Worker extends MyUnit {
             isHunting = true;
             bug2(uc.getLocation(), deer[0].getLocation());
         } else {
-            isHunting = false; // Deer was killed
+            if (isHunting) {
+                isHunting = false; // Deer was killed
+                closestLocation = null; // Reset pathfinding manually after worker is done chasing deer
+            }
         }
     }
 
@@ -341,11 +345,14 @@ public class Worker extends MyUnit {
         // For now, if workers fills up on one resource, they go back to base.
         int maxResourcesCarried = max(uc.getResourcesCarried());
 
-        // Gather resources as long as worker has not filled up on resource.
-        if (uc.canGatherResources() && ((maxResourcesCarried < 100 && !uc.hasResearched(Technology.BOXES, team)) || ((maxResourcesCarried < 200 && uc.hasResearched(Technology.BOXES, team))))) {
+        uc.println("can gather resources is -->");
+        uc.println(uc.canGatherResources());
+        // Gather resources as long as worker has not filled up on resource and there are still resources left.
+        if (uc.canGatherResources() && max(uc.senseResourceInfo(uc.getLocation())) > 0 && ((maxResourcesCarried < 100 && !uc.hasResearched(Technology.BOXES, team)) || ((maxResourcesCarried < 200 && uc.hasResearched(Technology.BOXES, team))))) {
             int maxResourceAmountAtLocation = max((uc.senseResourceInfo(uc.getLocation())));
 
             // If the unit can sit on a resource for 10 turns and gather, send a smoke signal about a location it has seen.
+            // TODO the logic of the if statement doesn't cover all cases...
             if (!messagesToSend.isEmpty()) {
                 if (maxResourcesCarried == 0 && ((maxResourceAmountAtLocation >= 100 && !uc.hasResearched(Technology.BOXES, team)) || (maxResourceAmountAtLocation >= 200 && uc.hasResearched(Technology.BOXES, team)))) {
                     if (uc.canMakeSmokeSignal())
@@ -356,7 +363,7 @@ public class Worker extends MyUnit {
 
             uc.gatherResources();
             uc.println("gathering resources");
-        // If the unit can't get resources because it is at its carrying capacity, deposit resources at base.
+        // If the unit can't get resources, deposit resources at base.
         } else {
             isMining = false;
             isDepositing = true;
@@ -396,9 +403,11 @@ public class Worker extends MyUnit {
         return max;
     }
 
+    // TODO worker circles around food dropped by deer instead of pathfinding there.
     void moveToResource() {
         // Location is already set, so just pathfind to it.
         if (currentFoundResourceIndex > -1) {
+            uc.println("target location: " + found_resources.get(currentFoundResourceIndex).location);
             if (bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location))
                 isMining = true;
             return;

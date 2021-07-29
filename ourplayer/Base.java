@@ -119,7 +119,6 @@ public class Base extends MyUnit {
             if (spawnRandom(UnitType.WORKER))
                 workers++;
         }
-        uc.println("workers");
     }
 
     void senseTerrain() {
