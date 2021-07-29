@@ -103,12 +103,18 @@ public class Worker extends MyUnit {
     }
 
     void senseResources() {
-        // If the target resource location can be sensed (assuming unit is holding a torch) and has no resources,
-        // a new target needs to be found.
         if (currentFoundResourceIndex > -1) {
             Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
-            uc.println(locationHasNoResources(currentResourceLocation));
+
+            // If the target resource location can be sensed and has no resources, a new target needs to be found.
             if (locationHasNoResources(currentResourceLocation)) {
+                found_resources.remove(currentFoundResourceIndex);
+                currentFoundResourceIndex = -1;
+            }
+
+            // If the target resource location can be sensed, but another worker is on the resource besides oneself,
+            // remove the resource from the list of found locations to prioritize a different target.
+            if (locationHasAnotherWorker(currentResourceLocation)) {
                 found_resources.remove(currentFoundResourceIndex);
                 currentFoundResourceIndex = -1;
             }
@@ -146,6 +152,18 @@ public class Worker extends MyUnit {
             return true;
         }
 
+        return false;
+    }
+
+    boolean locationHasAnotherWorker(Location resourceLocation) {
+        if (uc.canSenseLocation(resourceLocation) && !uc.getLocation().isEqual(resourceLocation)) {
+            UnitInfo unitAtLocation = uc.senseUnitAtLocation(resourceLocation);
+            // Worker does not exist.
+            if (unitAtLocation == null) {
+                return false;
+            }
+            return true;
+        }
         return false;
     }
 

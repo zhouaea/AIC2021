@@ -214,14 +214,11 @@ public abstract class MyUnit {
         if (closestLocation != null)
             uc.drawLineDebug(closestLocation, destination, 255, 255, 255);
 
-        uc.println("closestlocation = null is ");
-        uc.println(closestLocation == null);
         if (closestLocation != null)
             uc.println(closestLocation);
 
         // If the bot is on the closest location it has been in, attempt to move in a straight line from location to destination.
         if (closestLocation == null || currentLocation.distanceSquared(destination) < closestLocation.distanceSquared(destination)) {
-            uc.println("closest location");
             closestLocation = currentLocation;
             bugDirection = currentLocation.directionTo(destination);
             uc.move(bugDirection);

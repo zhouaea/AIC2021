@@ -15,10 +15,10 @@ public class Base extends MyUnit {
 
     void playRound(){
         spawnTroops();
-//        playDefense();
-//        senseEnemies();
-//        senseResources();
-//        researchTech();
+        playDefense();
+        senseEnemies();
+        senseResources();
+        researchTech();
 
         // It would be nice to sense terrain round 0 if we can.
 //        if (uc.getRound() == 0)
@@ -110,13 +110,16 @@ public class Base extends MyUnit {
     }
 
     void spawnTroops() {
-        if (explorers < 1)
+        if (explorers < 1) {
             if (spawnRandom(UnitType.EXPLORER))
                 explorers++;
+        }
 
-        if (workers < 2)
+        if (workers < 5) {
             if (spawnRandom(UnitType.WORKER))
                 workers++;
+        }
+        uc.println("workers");
     }
 
     void senseTerrain() {
@@ -129,7 +132,6 @@ public class Base extends MyUnit {
         for (Direction dir : dirs){
             if (uc.canSpawn(t, dir)){
                 uc.spawn(t, dir);
-                workers++;
                 return true;
             }
         }
