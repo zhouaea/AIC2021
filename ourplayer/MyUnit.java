@@ -29,23 +29,12 @@ public abstract class MyUnit {
 
     UnitController uc;
 
-    Location enemyBaseLocation;
+    Location closestLocation = null;
+    Direction bugDirection = null;
 
-    Map<Integer, ArrayList<ResourceInfo>> nuevoResources = new HashMap<>();
-
-    ArrayList<ResourceInfo> newResources = new ArrayList<>();
-
-    ArrayList<Location> seenResources = new ArrayList<>();
-
-    Direction currentDir;
-
-    int roundSpawned;
 
     MyUnit(UnitController uc){
         this.uc = uc;
-        this.nuevoResources.put(WOOD, new ArrayList<>());
-        this.nuevoResources.put(STONE, new ArrayList<>());
-        this.nuevoResources.put(FOOD, new ArrayList<>());
     }
 
     abstract void playRound();
@@ -206,206 +195,84 @@ public abstract class MyUnit {
         return actual_location;
     }
 
-    //Pathfinder:
-    ArrayList<Waypoint> currentPath = new ArrayList<>();
-    Location currentDestination;
+    /** Left handed bug that attempts to stay in a straight line.
+     * @param currentLocation
+     * @param destination
+     * @return true if at location, false if still moving towards it.
+     */
+    boolean bug2(Location currentLocation, Location destination) {
+        if (!uc.canMove())
+            return false;
 
-    public boolean inClosedList(Waypoint item, HashSet<Waypoint> closedList) {
-        for (Waypoint w : closedList) {
-            if (w.equals(item)) {
-                return true;
-            }
+        if (destinationIsReached(currentLocation, destination)) {
+            uc.println("destination reached");
+            closestLocation = null;
+            return true;
+        }
+
+        // Show line from closest location to the destination when clicking on unit.
+        if (closestLocation != null)
+            uc.drawLineDebug(closestLocation, destination, 255, 255, 255);
+
+        uc.println("closestlocation = null is ");
+        uc.println(closestLocation == null);
+        if (closestLocation != null)
+            uc.println(closestLocation);
+
+        // If the bot is on the closest location it has been in, attempt to move in a straight line from location to destination.
+        if (closestLocation == null || currentLocation.distanceSquared(destination) < closestLocation.distanceSquared(destination)) {
+            uc.println("closest location");
+            closestLocation = currentLocation;
+            bugDirection = currentLocation.directionTo(destination);
+            uc.move(bugDirection);
+        }
+        // If this is not possible, keep bot's left side on obstacle until it moves to a closer location than it had before.
+        else {
+            leftBug();
         }
 
         return false;
     }
 
-    public Location lastResortEstimate(Location dest) {
-        Location[] visibleTiles = uc.getVisibleLocations(true);
-
-        Location closest = null;
-        for (Location tile : visibleTiles) {
-            if (closest == null) {
-                closest = tile;
-                continue;
+    /** Keep bot's left side on obstacle.
+     */
+    private void leftBug() {
+        uc.println("navigate around obstacle");
+        // Rotate right until the bot can move forward
+        int i = 0;
+        for (i = 0; i < 8; i++) {
+            if (uc.canMove(bugDirection)) {
+                uc.move(bugDirection);
+                break;
             }
-
-            if (computeH(tile, dest) < computeH(closest, dest) && uc.isAccessible(tile) && !tile.isEqual(uc.getLocation())) {
-                closest = tile;
-            }
+            else
+                bugDirection = bugDirection.rotateRight();
         }
 
-        return closest;
+        // Rotate 90 degrees left each turn to "push against the wall" and catch a potential curve of the wall.
+        bugDirection = bugDirection.rotateLeft();
+        bugDirection = bugDirection.rotateLeft();
     }
 
-    /**
-     * computeEstimate provides an alternative location if the original is
-     * undetectable. It arrives at coordinate by finding the intersections of
-     * the line connecting the unit and the destination and the unit's circle of
-     * detection.
-     * @param dest The destination the unit is expected to travel to.
-     * @return An alternative location.
-     */
-    public Location computeEstimate(Location dest) {
-        float x0, x1, y0, y1, r, m;
-        x0 = uc.getLocation().x;
-        y0 = uc.getLocation().y;
-        x1 = dest.x;
-        y1 = dest.y;
-        m = (y1 - y0) / (x1 - x0);
-        r = (16 - uc.getInfo().getDetectionLevel()) / 2;
-
-        double xCalc = r/Math.sqrt(1 + m * m);
-        double yCalc = r/Math.sqrt(1 + 1 / (m * m));
-
-        int xPos = (int)(x0 + xCalc);
-        int yPos = (int)(y0 + yCalc);
-        int xNeg = (int)(x0 - xCalc);
-        int yNeg = (int)(y0 - yCalc);
-
-        Location one = new Location(xPos, yPos);
-        Location two = new Location(xNeg, yNeg);
-
-        if (one.distanceSquared(dest) < two.distanceSquared(dest)) {
-            return one;
-        } else {
-            return two;
-        }
-    }
-
-    public int computeH(Location start, Location end) {
-        int dx = Math.abs(start.x - end.x);
-        int dy = Math.abs(start.y - end.y);
-        int D = 1;
-        double D2 = 1.414;
-
-        return (int)(D * (dx + dy) + (D2 - 2 * D) * Math.min(dx, dy));
-    }
-
-    /**
-     * computeAStar uses the AStar algorithm to generate the shortest feasible
-     * path to a location.
-     * @param dest The destination the unit is expected to travel to.
-     * @return A list of waypoints.
-     */
-    public ArrayList<Waypoint> computeAStar(Location dest) {
-        int energyStart = uc.getEnergyUsed();
-        Heap openList = new Heap(2500);
-        HashSet<Waypoint> closedList = new HashSet<>();
-        ArrayList<Waypoint> waypoints = new ArrayList<>();
-
-        Waypoint start = new Waypoint(uc.getLocation());
-        openList.add(start);
-
-        while (openList.count() > 0) {
-            Waypoint currentWaypoint = openList.removeFirst();
-            closedList.add(currentWaypoint);
-
-            if (currentWaypoint.loc.isEqual(dest)) {
-                Waypoint temp = currentWaypoint;
-                while (temp != start) {
-                    waypoints.add(temp);
-                    temp = temp.parent;
-                }
-                Collections.reverse(waypoints);
-
-                int energyEnd = uc.getEnergyUsed() - energyStart;
-                System.out.println(energyEnd);
-
-                return waypoints;
-            }
-
+    boolean destinationIsReached(Location currentLocation, Location destination) {
+        // If pathfinding to base, set the destination to be at an adjacent tile.
+        if (uc.senseUnitAtLocation(destination) != null && uc.senseUnitAtLocation(destination).getType() == UnitType.BASE) {
+            uc.println("base sensed");
             for (Direction dir : dirs) {
-                Waypoint neighbor = new Waypoint(currentWaypoint.loc.add(dir));
-                if (!uc.canSenseLocation(neighbor.loc) || !uc.isAccessible(neighbor.loc) || inClosedList(neighbor, closedList) || uc.senseUnitAtLocation(neighbor.loc) != null) {
-                    continue;
-                }
-
-                int movCost = currentWaypoint.gCost + computeH(currentWaypoint.loc, neighbor.loc);
-                if (movCost < neighbor.gCost || !openList.heapContains(neighbor)) {
-                    neighbor.gCost = movCost;
-                    neighbor.hCost = computeH(neighbor.loc, dest);
-                    neighbor.parent = currentWaypoint;
-
-                    if (!openList.heapContains(neighbor)) {
-                        openList.add(neighbor);
-                    }
-                }
-            }
-        }
-
-        return waypoints;
-    }
-
-    /**
-     * getPath generates waypoints for the unit to follow. Currently,
-     * only AStar is used - but support for different algorithms will be added.
-     * NOTE: if the unit can't see the destination, getPath will pass a location
-     * closest to the destination and within the detection range (using algebra).
-     * @param dest The destination the unit is expected to travel to.
-     * @return A list of waypoints.
-     */
-    public ArrayList<Waypoint> getPath(Location dest) {
-        Location estimate;
-
-        estimate = dest;
-
-        if (!uc.canSenseLocation(dest) || !uc.isAccessible(dest)) {
-            estimate = computeEstimate(dest);
-
-            if (!uc.isAccessible(estimate)) {
-                for (Direction dir : dirs) {
-                    Location neighbor = estimate.add(dir);
-                    if (uc.canSenseLocation(neighbor) && uc.isAccessible(neighbor)) {
-                        estimate = neighbor;
-                        return computeAStar(estimate);
-                    }
-                }
-                estimate = lastResortEstimate(dest);
-            }
-        }
-
-        if (uc.senseUnitAtLocation(estimate) != null) {
-            for (Direction dir : dirs) {
-                Location alternative = estimate.add(dir);
-                if (uc.canSenseLocation(alternative) && uc.isAccessible(alternative) && uc.senseUnitAtLocation(alternative) == null) {
-                    estimate = alternative;
+                Location alternative = destination.add(dir);
+                if (currentLocation.isEqual(alternative)) {
+                    uc.println("base reached");
+                    destination = alternative;
                     break;
                 }
             }
         }
 
-        return computeAStar(estimate);
-    }
-
-    /**
-     * goToLocation controls the movement objective of the unit.
-     * It updates the target destination and provides an initial path.
-     * @param dest This is the destination the unit is expected to travel to.
-     */
-    public boolean goToLocation(Location dest) {
-        if (!dest.isEqual(currentDestination)) {
-            currentDestination = dest;
-            currentPath = getPath(dest);
-            return false;
+        // Once at destination, reset for new location.
+        if (currentLocation.isEqual(destination)) {
+            return true;
         }
 
-        return uc.getLocation().isEqual(dest);
-    }
-
-    /**
-     * FollowPath should be called every round. It moves the unit
-     * along the current path in storage. If the end is reached and
-     * the unit isn't at the target destination, a new path will be generated.
-     */
-    public void followPath() {
-        if (uc.canMove() && !currentPath.isEmpty()) {
-            uc.move(uc.getLocation().directionTo(currentPath.get(0).loc));
-            currentPath.remove(0);
-
-            if (currentPath.isEmpty() && !uc.getLocation().isEqual(currentDestination)) {
-                currentPath = getPath(currentDestination);
-            }
-        }
+        return false;
     }
 }
