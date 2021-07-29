@@ -17,7 +17,6 @@ public class Worker extends MyUnit {
 
     ArrayList<ResourceInfo> found_resources = new ArrayList<>(); //ArrayList instead of queue in case we want to prioritize certain resources
     ArrayList<ResourceInfo> messagesToSend = new ArrayList<>();
-
     int currentFoundResourceIndex = -1;
 
     boolean isHunting = false;
@@ -104,20 +103,19 @@ public class Worker extends MyUnit {
     }
 
     void senseResources() {
-        // Look at resources in vision radius.
-        ResourceInfo[] resources = uc.senseResources();
-
+        // If the target resource location can be sensed (assuming unit is holding a torch) and has no resources,
+        // a new target needs to be found.
         if (currentFoundResourceIndex > -1) {
             Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
-            if (uc.canSenseLocation(currentResourceLocation)) {
-                // If the current resource should be in sight (assuming unit is holding a torch) and it is not sensed, remove it.
-                if (uc.senseResourceInfo(currentResourceLocation) == null)
-                    found_resources.remove(currentFoundResourceIndex);
+            if (locationHasNoResources(currentResourceLocation)) {
+                found_resources.remove(currentFoundResourceIndex);
+                currentFoundResourceIndex = -1;
             }
         }
 
-        // If the found resources haven't been added yet, add them to the list, and if there is a large amount of
+        // If sensed resources haven't been added yet, add them to the list, and if there is a large amount of
         // resources, save it as a message to send.
+        ResourceInfo[] resources = uc.senseResources();
         for (ResourceInfo resource : resources) {
             if (!found_resources.contains(resource)) {
                 found_resources.add(resource);
@@ -127,6 +125,26 @@ public class Worker extends MyUnit {
                 }
             }
         }
+    }
+
+    /**
+     * Helper function for senseResources().
+     * @param resourceLocation is the location to be checked for resources
+     * @return true if the location can be sensed by the unit and has no resources
+     */
+    boolean locationHasNoResources(Location resourceLocation) {
+        if (uc.canSenseLocation(resourceLocation)) {
+            ResourceInfo[] resourcesAtLocation = uc.senseResourceInfo(resourceLocation);
+            for (ResourceInfo resource : resourcesAtLocation) {
+                // Resource exists.
+                if (resource != null)
+                    return false;
+            }
+            uc.println("resources do not exist");
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -305,14 +323,6 @@ public class Worker extends MyUnit {
 
             uc.gatherResources();
             uc.println("gathering resources");
-        // If the unit can't get resources because there are no more left, the location is no longer valid, so remove it
-        // from the list of found locations and as the currentLocation being travelled to.
-        } else if (maxResourcesCarried < GameConstants.MAX_RESOURCE_CAPACITY || (maxResourcesCarried < GameConstants.MAX_RESOURCE_CAPACITY_BOXES && uc.hasResearched(Technology.BOXES, team))) {
-            uc.println(currentFoundResourceIndex);
-            found_resources.remove(currentFoundResourceIndex);
-            currentFoundResourceIndex = -1;
-            isMining = false;
-            uc.println("No resources left");
         // If the unit can't get resources because it is at its carrying capacity, deposit resources at base.
         } else {
             isMining = false;
