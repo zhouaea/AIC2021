@@ -43,7 +43,7 @@ public class Explorer extends MyUnit {
       int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
       this.uc.makeSmokeSignal(signal);
       this.uc.println(
-          "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+              "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
       this.sentSignal = true;
     }
 
@@ -54,7 +54,7 @@ public class Explorer extends MyUnit {
           int signal = this.encodeResourceMessage(this.newResources.remove(0));
           this.uc.makeSmokeSignal(signal);
           this.uc.println(
-              "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+                  "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
         }
       }
     }
@@ -102,7 +102,7 @@ public class Explorer extends MyUnit {
     this.uc.println("Energy used after optimal direction calculation: " + this.uc.getEnergyUsed());
     while (this.uc.canMove() && tries-- > 0) {
       if (this.uc.canMove(this.currentDir)
-          && this.validLocationCheck(this.uc.getLocation().add(this.currentDir))) {
+              && this.validLocationCheck(this.uc.getLocation().add(this.currentDir))) {
         this.uc.move(this.currentDir);
         // record new visited location
         //        this.visited.add(this.uc.getLocation());
@@ -231,7 +231,7 @@ public class Explorer extends MyUnit {
   boolean enemyReaction() {
     UnitInfo thisInfo = this.uc.getInfo();
     UnitInfo[] enemies =
-        this.uc.senseUnits(thisInfo.getType().getVisionRange(), this.uc.getOpponent());
+            this.uc.senseUnits(thisInfo.getType().getVisionRange(), this.uc.getOpponent());
     for (UnitInfo info : enemies) {
       // if the enemies are hostile
       if (info.getAttack() > 0) {

@@ -49,7 +49,10 @@ public class Worker extends MyUnit {
     }
 
     senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first
-                    // priority.
+    // priority.
+
+    // checks to see if we can find enemy base
+    this.recordEnemyBase();
     uc.println(uc.getEnergyLeft());
     decodeResourceMessages(); // get locations of resources from other units
     uc.println(uc.getEnergyLeft());
@@ -103,15 +106,19 @@ public class Worker extends MyUnit {
     for (int smokeSignal : smokeSignals) {
       message = decodeSmokeSignal(currentLocation, smokeSignal);
       if (message != null)
-        if (message.unitCode == WOOD)
+        if (message.unitCode == WOOD) {
           found_resources.add(
               new ResourceInfo(Resource.WOOD, message.unitAmount, message.location));
-        else if (message.unitCode == STONE)
+          uc.println("wood resource added");
+        } else if (message.unitCode == STONE) {
           found_resources.add(
               new ResourceInfo(Resource.STONE, message.unitAmount, message.location));
-        else if (message.unitCode == FOOD)
+          uc.println("stone resource added");
+        } else if (message.unitCode == FOOD) {
           found_resources.add(
               new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
+          uc.println("food resource added");
+        }
     }
   }
 
@@ -119,19 +126,14 @@ public class Worker extends MyUnit {
     if (currentFoundResourceIndex > -1) {
       Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
 
-      // If the target resource location can be sensed and has no resources, a new target needs to
-      // be found.
-      if (locationHasNoResources(currentResourceLocation)) {
+      // If the target resource location can be sensed and has no resources or another worker is
+      // currently
+      // on the resource, a new target needs to be found.
+      if (locationHasNoResources(currentResourceLocation)
+          || locationHasAnotherWorker(currentResourceLocation)) {
         found_resources.remove(currentFoundResourceIndex);
         currentFoundResourceIndex = -1;
-      }
-
-      // If the target resource location can be sensed, but another worker is on the resource
-      // besides oneself,
-      // remove the resource from the list of found locations to prioritize a different target.
-      if (locationHasAnotherWorker(currentResourceLocation)) {
-        found_resources.remove(currentFoundResourceIndex);
-        currentFoundResourceIndex = -1;
+        closestLocation = null; // Reset pathfinding manually after worker changes target.
       }
     }
 
@@ -159,7 +161,6 @@ public class Worker extends MyUnit {
   boolean locationHasNoResources(Location resourceLocation) {
     if (uc.canSenseLocation(resourceLocation)) {
       ResourceInfo[] resourcesAtLocation = uc.senseResourceInfo(resourceLocation);
-      uc.println(resourcesAtLocation.length);
       for (ResourceInfo resource : resourcesAtLocation) {
         // Resource exists.
         if (resource != null) {
@@ -207,7 +208,10 @@ public class Worker extends MyUnit {
       isHunting = true;
       bug2(uc.getLocation(), deer[0].getLocation());
     } else {
-      isHunting = false; // Deer was killed
+      if (isHunting) {
+        isHunting = false; // Deer was killed
+        closestLocation = null; // Reset pathfinding manually after worker is done chasing deer
+      }
     }
   }
 
@@ -352,14 +356,19 @@ public class Worker extends MyUnit {
     // For now, if workers fills up on one resource, they go back to base.
     int maxResourcesCarried = max(uc.getResourcesCarried());
 
-    // Gather resources as long as worker has not filled up on resource.
+    uc.println("can gather resources is -->");
+    uc.println(uc.canGatherResources());
+    // Gather resources as long as worker has not filled up on resource and there are still
+    // resources left.
     if (uc.canGatherResources()
+        && max(uc.senseResourceInfo(uc.getLocation())) > 0
         && ((maxResourcesCarried < 100 && !uc.hasResearched(Technology.BOXES, team))
             || ((maxResourcesCarried < 200 && uc.hasResearched(Technology.BOXES, team))))) {
       int maxResourceAmountAtLocation = max((uc.senseResourceInfo(uc.getLocation())));
 
       // If the unit can sit on a resource for 10 turns and gather, send a smoke signal about a
       // location it has seen.
+      // TODO the logic of the if statement doesn't cover all cases...
       if (!messagesToSend.isEmpty()) {
         if (maxResourcesCarried == 0
             && ((maxResourceAmountAtLocation >= 100 && !uc.hasResearched(Technology.BOXES, team))
@@ -373,8 +382,7 @@ public class Worker extends MyUnit {
 
       uc.gatherResources();
       uc.println("gathering resources");
-      // If the unit can't get resources because it is at its carrying capacity, deposit resources
-      // at base.
+      // If the unit can't get resources, deposit resources at base.
     } else {
       isMining = false;
       isDepositing = true;
@@ -417,6 +425,7 @@ public class Worker extends MyUnit {
   void moveToResource() {
     // Location is already set, so just pathfind to it.
     if (currentFoundResourceIndex > -1) {
+      uc.println("target location: " + found_resources.get(currentFoundResourceIndex).location);
       if (bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location))
         isMining = true;
       return;
