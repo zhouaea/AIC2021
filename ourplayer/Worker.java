@@ -22,6 +22,9 @@ public class Worker extends MyUnit {
 
     boolean isMining = false;
 
+    boolean isBuilding = false;
+    ArrayList<Location> buildingLocations = new ArrayList<>();
+
     boolean isDepositing = false;
     boolean knowsPlaceToDeposit = false;
     Location depositLocation;
@@ -31,6 +34,7 @@ public class Worker extends MyUnit {
     int quarries = 0;
 
     void playRound(){
+        // TODO on X, workers run out of energy
         // If just created, store team's base location.
         if (!knowsPlaceToDeposit) {
             rememberBaseLocation();
@@ -38,7 +42,7 @@ public class Worker extends MyUnit {
 
         senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first priority.
         uc.println(uc.getEnergyLeft());
-        decodeResourceMessages(); // get locations of resources from other units
+        decodeMessages(); // get locations of resources from other units or a place to build a building from the base
         uc.println(uc.getEnergyLeft());
         senseResources(); // add/remove resource locations to/from memory
         senseDeer(); //  check local area for deer to hunt
@@ -46,8 +50,12 @@ public class Worker extends MyUnit {
         keepTorchLit();
         uc.println(uc.getEnergyLeft());
 
+        if (isBuilding) {
+            spawnBuilding(); // once jobs is unlocked, spawn 20 buildings max
+            uc.println("building");
+        }
         // Hunting takes precedence over depositing (can kill deer on the way).
-        if (isHunting) {
+        else if (isHunting) {
             hunt();
             uc.println("hunt");
         } else if (isDepositing) {
@@ -63,7 +71,6 @@ public class Worker extends MyUnit {
 
         uc.println(uc.getEnergyLeft());
 
-        spawnBuildings(); // once jobs is unlocked, spawn 20 buildings max
         uc.println(uc.getEnergyLeft());
     }
 
@@ -82,12 +89,15 @@ public class Worker extends MyUnit {
 
     }
 
-    private void decodeResourceMessages() {
+    /**
+     * If a smoke signal is from an ally and is for a resource location, add the encoded resource to found_resources.
+     * Alternatively, if the signal is for a building location, add the encoded location to buildingLocations.
+     */
+    private void decodeMessages() {
         int[] smokeSignals = uc.readSmokeSignals();
         Location currentLocation = uc.getLocation();
         DecodedMessage message;
 
-        // If a smoke signal is from an ally and is for a resource location, add the resource to the found_resources.
         for (int smokeSignal : smokeSignals) {
             message = decodeSmokeSignal(currentLocation, smokeSignal);
             if (message != null)
@@ -97,6 +107,10 @@ public class Worker extends MyUnit {
                     found_resources.add(new ResourceInfo(Resource.STONE, message.unitAmount, message.location));
                 else if (message.unitCode == FOOD)
                     found_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
+                else if (message.unitCode == BUILDING_LOCATION) {
+                    buildingLocations.add(message.location);
+                    uc.println("building location received");
+                }
         }
     }
 
@@ -120,7 +134,7 @@ public class Worker extends MyUnit {
             if (!alreadyRecordedResource(resource)) {
                 found_resources.add(resource);
 
-                if (resource.amount > 200) {
+                if (resource.amount >= 100) {
                     messagesToSend.add(resource);
                 }
             }
@@ -132,7 +146,7 @@ public class Worker extends MyUnit {
      * @param resourceLocation is the location to be checked for resources
      * @return true if the location can be sensed by the unit and has no resources
      */
-    boolean locationHasNoResources(Location resourceLocation) {
+    private boolean locationHasNoResources(Location resourceLocation) {
         if (uc.canSenseLocation(resourceLocation)) {
             ResourceInfo[] resourcesAtLocation = uc.senseResourceInfo(resourceLocation);
             for (ResourceInfo resource : resourcesAtLocation) {
@@ -147,7 +161,7 @@ public class Worker extends MyUnit {
         return false;
     }
 
-    boolean locationHasAnotherWorker(Location resourceLocation) {
+    private boolean locationHasAnotherWorker(Location resourceLocation) {
         if (uc.canSenseLocation(resourceLocation) && !uc.getLocation().isEqual(resourceLocation)) {
             UnitInfo unitAtLocation = uc.senseUnitAtLocation(resourceLocation);
             // Worker does not exist.
@@ -168,7 +182,7 @@ public class Worker extends MyUnit {
         return false;
     }
 
-    boolean sameLocation(Location loc1, Location loc2) {
+    private boolean sameLocation(Location loc1, Location loc2) {
         return loc1.x == loc2.x && loc1.y == loc2.y;
     }
 
@@ -181,7 +195,6 @@ public class Worker extends MyUnit {
         if (deer.length != 0) {
             currentDeerLocation = deer[0].getLocation();
             isHunting = true;
-            bug2(uc.getLocation(), deer[0].getLocation());
         } else {
             if (isHunting) {
                 isHunting = false; // Deer was killed
@@ -189,7 +202,6 @@ public class Worker extends MyUnit {
             }
         }
     }
-
 
     /**
      * When torch is almost finished, throw it on an adjacent square and light another torch with it.
@@ -277,22 +289,91 @@ public class Worker extends MyUnit {
         return false;
     }
 
+    // Move adjacent to building location and place a building there. Choose a different build location if a building
+    // has already been placed. If a unit that is not a building is currently on the location, wait until it moves.
+    // TODO prevent workers from waiting too long to place a building
+    void spawnBuilding() {
+        // Only switch off of building mode if there are no buildings to place
+        if (!buildingLocations.isEmpty()) {
+            Location currentBuildingLocation = buildingLocations.get(0);
+            uc.println("current building location: " + currentBuildingLocation);
+
+            // If the target building location can be sensed and already has a building on it, a new target needs to be moved to.
+            if (!canPlaceBuilding(currentBuildingLocation)) {
+                buildingLocations.remove(0);
+                closestLocation = null; // Reset pathfinding manually after worker changes target.
+            }
+            // If the location is not in range or there is no building on the location, move toward building location and spawn a building there.
+            else if (bug2(uc.getLocation(), currentBuildingLocation, true)) {
+                Direction directionToBuilding = uc.getLocation().directionTo(currentBuildingLocation);
+
+                int buildingType = (int)(uc.getRandomDouble() * 3);
+                if (buildingType == 0 && uc.canSpawn(UnitType.FARM, directionToBuilding)) {
+                    uc.spawn(UnitType.FARM, directionToBuilding);
+                } else if (buildingType == 1 && uc.canSpawn(UnitType.SAWMILL, directionToBuilding)) {
+                    uc.spawn(UnitType.SAWMILL, directionToBuilding);
+                } else if (buildingType == 2 && uc.canSpawn(UnitType.QUARRY, directionToBuilding)) {
+                    uc.spawn(UnitType.QUARRY, directionToBuilding);
+                }
+            }
+        } else {
+            isBuilding = false;
+        }
+    }
+
+    /**
+     * Check to make sure that the location does not already have a building on it and is not a water or mountain tile.
+     */
+    private boolean canPlaceBuilding(Location buildingLocation) {
+        if (uc.canSenseLocation(buildingLocation)) {
+            UnitInfo unitAtLocation = uc.senseUnitAtLocation(buildingLocation);
+            // If there is an immovable unit on the location, a building can not be placed.
+            if (unitAtLocation != null && (unitAtLocation.getType() == UnitType.QUARRY || unitAtLocation.getType() == UnitType.SAWMILL || unitAtLocation.getType() == UnitType.FARM || unitAtLocation.getType() == UnitType.SETTLEMENT || unitAtLocation.getType() == UnitType.BARRACKS || unitAtLocation.getType() == UnitType.BASE)) {
+                return false;
+            }
+
+            if (uc.hasMountain(buildingLocation) || uc.hasWater(buildingLocation)) {
+                return false;
+            }
+
+            return true;
+        }
+        // Assume that a building can be placed on the location until seen otherwise.
+        return true;
+    }
+
+    /**
+     * Attempt to attack and move to deer in vision radius.
+     */
+    void hunt() {
+        if (uc.canAttack(currentDeerLocation)) {
+            uc.attack(currentDeerLocation);
+        }
+
+        bug2(uc.getLocation(), currentDeerLocation, true);
+
+        if (uc.canAttack(currentDeerLocation)) {
+            uc.attack(currentDeerLocation);
+        }
+    }
+
     /**
      * Pathfind to the unit's chosen deposit location, and deposit resources once arrived.
      * Additionally, spawn a barrack next to the deposit location if it doesn't exist already.
      */
     void deposit() {
         // Unit can only deposit once unit has reached its deposit location.
-        if (bug2(uc.getLocation(), depositLocation)) {
+        if (bug2(uc.getLocation(), depositLocation, true)) {
             if (uc.canDeposit()) {
-                // Ensure that one barrack is placed near the unit's deposit location once barracks are unlocked.
-                if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
-                    if (!checkForBarrack())
-                        spawnRandom(UnitType.BARRACKS);
-                }
-
                 uc.deposit();
                 isDepositing = false;
+
+                // TODO activate building mode if the base is in the worker's vision range?
+                // Once worker has deposited resources, jobs is unlocked, and it has a build location, isBuilding = true.
+                if (uc.hasResearched(Technology.JOBS, team) && !buildingLocations.isEmpty()) {
+                    isBuilding = true;
+                    uc.println("switching to building mode");
+                }
             }
         }
     }
@@ -311,21 +392,6 @@ public class Worker extends MyUnit {
         }
 
         return false;
-    }
-
-    /**
-     * Attempt to attack and move to deer in vision radius.
-     */
-    void hunt() {
-        if (uc.canAttack(currentDeerLocation)) {
-            uc.attack(currentDeerLocation);
-        }
-
-        bug2(uc.getLocation(), currentDeerLocation);
-
-        if (uc.canAttack(currentDeerLocation)) {
-            uc.attack(currentDeerLocation);
-        }
     }
 
     /**
@@ -398,7 +464,7 @@ public class Worker extends MyUnit {
         // Location is already set, so just pathfind to it.
         if (currentFoundResourceIndex > -1) {
             uc.println("target location: " + found_resources.get(currentFoundResourceIndex).location);
-            if (bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location))
+            if (bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false))
                 isMining = true;
             return;
         }
@@ -413,23 +479,6 @@ public class Worker extends MyUnit {
         // If the list of found locations is not empty and a location isn't set, set target location to the first one
         // in the resource_list.
         currentFoundResourceIndex = 0;
-        bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location);
-    }
-
-
-    void spawnBuildings() {
-        if (uc.hasResearched(Technology.JOBS, team)) {
-            if (farms <= 7) {
-                if (spawnRandom(UnitType.FARM)) farms++;
-            }
-
-            if (sawmills <= 7) {
-                if (spawnRandom(UnitType.SAWMILL)) sawmills++;
-            }
-
-            if (quarries <= 7) {
-                if (spawnRandom(UnitType.QUARRY)) quarries++;
-            }
-        }
+        bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false);
     }
 }

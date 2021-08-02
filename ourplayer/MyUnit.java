@@ -10,7 +10,7 @@ public abstract class MyUnit {
     final int WOOD = 1;
     final int STONE = 2;
     final int FOOD = 3;
-    final int DEER = 4;
+    final int PLACEHOLDER_1 = 4;
     final int ENEMY_WORKER = 5;
     final int ENEMY_EXPLORER = 6;
     final int ENEMY_TRAPPER = 7;
@@ -19,9 +19,9 @@ public abstract class MyUnit {
     final int ENEMY_WOLF = 10;
     final int ENEMY_SETTLEMENT = 11;
     final int ENEMY_BARRACKS = 12;
-    final int ENEMY_FARM = 13;
-    final int ENEMY_SAWMILL = 14;
-    final int ENEMY_QUARRY = 15;
+    final int ENEMY_RESOURCE_BUILDING = 13;
+    final int BUILDING_LOCATION = 14;
+    final int PLACEHOLDER_2 = 15;
 
     final int teamIdentifier = 74;
 
@@ -79,7 +79,12 @@ public abstract class MyUnit {
         return false;
     }
 
-     int encodeResourceMessage(ResourceInfo resourceInfo) {
+    // TODO We can verify that the smoke signal is ours by making sure that unit code 14's have unit amount 0.
+    int encodeBuildingLocation(Location buildingLocation) {
+        return encodeSmokeSignal(buildingLocation, BUILDING_LOCATION, 0);
+    }
+
+    int encodeResourceMessage(ResourceInfo resourceInfo) {
         if (resourceInfo.resourceType == Resource.WOOD)
             return encodeSmokeSignal(resourceInfo.location, WOOD, resourceInfo.amount);
         else if (resourceInfo.resourceType == Resource.STONE)
@@ -117,9 +122,9 @@ public abstract class MyUnit {
     }
 
     int encodeLocation(Location location) {
-        int encoded_x = location.x % 128;
-        int encoded_y = location.y % 128;
-        int message = encoded_x * 128 + encoded_y;
+        int encodedX = location.x % 128;
+        int encodedY = location.y % 128;
+        int message = encodedX * 128 + encodedY;
 
         return message;
     }
@@ -161,38 +166,67 @@ public abstract class MyUnit {
     }
 
     Location decodeLocation(Location current_location, int code) {
-        int encoded_y = 255 & code; // encoded y coordinate is first 8 bits
-        int encoded_x = 255 & (code / 128);  // encoded x coordinate is bits 8-15
+        int encodedY = 255 & code; // encoded y coordinate is first 8 bits
+        int encodedX = 255 & (code / 128);  // encoded x coordinate is bits 8-15
 
         // Get close to the offset by getting rid of the remainder bits of the current location.
         int offsetX = (current_location.x / 128) * 128;
         int offsetY = (current_location.y / 128) * 128;
 
-        Location possible_location = new Location(offsetX + encoded_x, offsetY + encoded_y);
-        Location actual_location = possible_location;
+        Location possibleLocation = new Location(offsetX + encodedX, offsetY + encodedY);
+        Location bestLocationSoFar = possibleLocation;
+        uc.println(bestLocationSoFar);
 
-        // Offset may be off. Not sure if this is necessary.
-        Location alternate_location = possible_location.add(128, 0);
-        if (current_location.distanceSquared(alternate_location) < current_location.distanceSquared(possible_location)) {
-            actual_location = alternate_location;
+        // Offset may be off by 128 squares in either the x or y axes.
+        Location alternateLocation = possibleLocation.add(128, 128);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
         }
+        uc.println(alternateLocation);
 
-        alternate_location = possible_location.add(-128, 0);
-        if (current_location.distanceSquared(alternate_location) < current_location.distanceSquared(possible_location)) {
-            actual_location = alternate_location;
+        alternateLocation = alternateLocation.add(0, -128);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
         }
+        uc.println(alternateLocation);
 
-        alternate_location = possible_location.add(0, 128);
-        if (current_location.distanceSquared(alternate_location) < current_location.distanceSquared(possible_location)) {
-            actual_location = alternate_location;
+        alternateLocation = alternateLocation.add(0, -128);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
         }
+        uc.println(alternateLocation);
 
-        alternate_location = possible_location.add(0, -128);
-        if (current_location.distanceSquared(alternate_location) < current_location.distanceSquared(possible_location)) {
-            actual_location = alternate_location;
+        alternateLocation = alternateLocation.add(-128, 0);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
         }
+        uc.println(alternateLocation);
 
-        return actual_location;
+        alternateLocation = alternateLocation.add(-128, 0);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
+        }
+        uc.println(alternateLocation);
+
+        alternateLocation = alternateLocation.add(0, 128);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
+        }
+        uc.println(alternateLocation);
+
+        alternateLocation = alternateLocation.add(0, 128);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
+        }
+        uc.println(alternateLocation);
+
+        alternateLocation = alternateLocation.add(128, 0);
+        if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
+            bestLocationSoFar = alternateLocation;
+        }
+        uc.println(alternateLocation);
+
+        return bestLocationSoFar;
     }
 
     /** Left handed bug that attempts to stay in a straight line.
@@ -200,11 +234,12 @@ public abstract class MyUnit {
      * @param destination
      * @return true if at location, false if still moving towards it.
      */
-    boolean bug2(Location currentLocation, Location destination) {
+    // TODO Avoid tiles within enemy attack radiuses and traps (for workers and explorers). Avoid the vision range of the base once location is known.
+    boolean bug2(Location currentLocation, Location destination, boolean adjacentDestination) {
         if (!uc.canMove())
             return false;
 
-        if (destinationIsReached(currentLocation, destination)) {
+        if (destinationIsReached(currentLocation, destination, adjacentDestination)) {
             uc.println("destination reached");
             closestLocation = null;
             return true;
@@ -251,16 +286,29 @@ public abstract class MyUnit {
         bugDirection = bugDirection.rotateLeft();
     }
 
-    boolean destinationIsReached(Location currentLocation, Location destination) {
-        // If pathfinding to base, set the destination to be at an adjacent tile.
-        if (uc.senseUnitAtLocation(destination) != null && uc.senseUnitAtLocation(destination).getType() == UnitType.BASE) {
-            uc.println("base sensed");
-            for (Direction dir : dirs) {
-                Location alternative = destination.add(dir);
-                if (currentLocation.isEqual(alternative)) {
-                    uc.println("base reached");
-                    destination = alternative;
-                    break;
+    boolean destinationIsReached(Location currentLocation, Location destination, boolean adjacentDestination) {
+        // If pathfinding to a location adjacent to the destination, set the destination to be at an adjacent tile.
+        if (adjacentDestination) {
+            // If unit is on the destination instead of being adjacent to it, move to an adjacent tile, and the
+            // destination is now reached.
+            if (uc.getLocation().isEqual(destination)) {
+                for (Direction dir : dirs) {
+                    Location alternative = destination.add(dir);
+                    if (uc.canMove(dir)) {
+                        uc.move(dir);
+                        return true;
+                    }
+                }
+            // Otherwise, the destination is reached when the unit steps on a tile adjacent to the destination.
+            } else {
+                uc.println("base sensed");
+                for (Direction dir : dirs) {
+                    Location alternative = destination.add(dir);
+                    if (currentLocation.isEqual(alternative)) {
+                        uc.println("base reached");
+                        destination = alternative;
+                        break;
+                    }
                 }
             }
         }
