@@ -29,7 +29,7 @@ public class Base extends MyUnit {
         playDefense();
         senseEnemies();
         senseResources();
-        researchTech();
+        researchTech(); // TODO change research path based on different states like "normal", "water", etc.
         sendBuildingLocations();
 
 

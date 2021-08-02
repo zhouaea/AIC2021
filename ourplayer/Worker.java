@@ -34,7 +34,11 @@ public class Worker extends MyUnit {
     int quarries = 0;
 
     void playRound(){
-        // TODO on X, workers run out of energy
+        // TODO workers run out of energy when there are too many resources to sense
+        // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
+        // TODO prioritize closest targets rather than going in order for more efficient collection
+        // TODO Build settlements near far away resources
+        // TODO build a barrack in lattice structure
         // If just created, store team's base location.
         if (!knowsPlaceToDeposit) {
             rememberBaseLocation();
@@ -368,6 +372,12 @@ public class Worker extends MyUnit {
                 uc.deposit();
                 isDepositing = false;
 
+                if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+                    // Ensure that one barrack is placed near the unit's deposit location once barracks are unlocked.
+                    if (!checkForBarrack())
+                        spawnBarrack();
+                }
+
                 // TODO activate building mode if the base is in the worker's vision range?
                 // Once worker has deposited resources, jobs is unlocked, and it has a build location, isBuilding = true.
                 if (uc.hasResearched(Technology.JOBS, team) && !buildingLocations.isEmpty()) {
@@ -392,6 +402,24 @@ public class Worker extends MyUnit {
         }
 
         return false;
+    }
+
+    /**
+     * Helper function for deposit
+     * Spawn a barrack on a location that would fit a lattice structur.
+     */
+    private void spawnBarrack() {
+        Location potentialLocation;
+        for (Direction dir : dirs) {
+            if (uc.canSpawn(UnitType.BARRACKS, dir)) {
+                potentialLocation = uc.getLocation().add(dir);
+                // If potential location is within lattice structure, place a barrack there.
+                if ((potentialLocation.x % 2 == depositLocation.x % 2 && potentialLocation.y % 2 == depositLocation.y % 2) || potentialLocation.x % 2 != depositLocation.x % 2 && potentialLocation.y % 2 != depositLocation.y % 2) {
+                    uc.spawn(UnitType.BARRACKS, dir);
+                    break;
+                }
+            }
+        }
     }
 
     /**
