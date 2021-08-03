@@ -16,6 +16,7 @@ public class Worker extends MyUnit {
     ArrayList<ResourceInfo> found_resources = new ArrayList<>(); //ArrayList instead of queue in case we want to prioritize certain resources
     ArrayList<ResourceInfo> messagesToSend = new ArrayList<>();
     int currentFoundResourceIndex = -1;
+    final int MAX_RESOURCES_TO_REMEMBER = 5;
 
     boolean isHunting = false;
     Location currentDeerLocation;
@@ -29,16 +30,18 @@ public class Worker extends MyUnit {
     boolean knowsPlaceToDeposit = false;
     Location depositLocation;
 
+    Direction currentDir = Direction.NORTH;
+
     int farms = 0;
     int sawmills = 0;
     int quarries = 0;
 
     void playRound(){
-        // TODO workers run out of energy when there are too many resources to sense
         // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
-        // TODO prioritize closest targets rather than going in order for more efficient collection
         // TODO Build settlements near far away resources
-        // TODO build a barrack in lattice structure
+        // TODO Have the base call upon one worker to build buildings
+        // TODO Seperate found locations with broadcasted locations, so broadcasted has lower priority
+        // TODO Prioritize specific resources?
         // If just created, store team's base location.
         if (!knowsPlaceToDeposit) {
             rememberBaseLocation();
@@ -135,11 +138,15 @@ public class Worker extends MyUnit {
         // resources, save it as a message to send.
         ResourceInfo[] resources = uc.senseResources();
         for (ResourceInfo resource : resources) {
-            if (!alreadyRecordedResource(resource)) {
-                found_resources.add(resource);
+            if (found_resources.size() <= MAX_RESOURCES_TO_REMEMBER) {
+                if (!alreadyRecordedResource(resource)) {
+                    if (!locationHasAnotherWorker(resource.location)) {
+                        found_resources.add(resource);
+                    }
 
-                if (resource.amount >= 100) {
-                    messagesToSend.add(resource);
+                    if (resource.amount >= 100) {
+                        messagesToSend.add(resource);
+                    }
                 }
             }
         }
@@ -207,95 +214,8 @@ public class Worker extends MyUnit {
         }
     }
 
-    /**
-     * When torch is almost finished, throw it on an adjacent square and light another torch with it.
-     */
-    void keepTorchLit() {
-        int torchRounds = uc.getInfo().getTorchRounds();
-        // Light torch when spawned.
-        if (torchRounds == 0) {
-            if (uc.canLightTorch())
-                uc.lightTorch();
-        }
-        // After initial torch light, throw torch on ground and light a new one when the torch is almost depleted.
-        // TODO: Check limit
-        else if (torchRounds <= 5) {
-            if (dropTorch())
-                if (uc.canLightTorch()) {
-                    uc.lightTorch();
-                }
-                else
-                    uc.println("SOMEHOW TORCH CAN NOT BE LIT");
-        }
-    }
-
-    /**
-     * Attempt to throw the unit's torch at an adjacent tile.
-     * @return whether or not unit was able to throw a torch on an adjacent tile
-     */
-    private boolean dropTorch() {
-        Location current_location = uc.getLocation();
-        int temp_x = current_location.x;
-        int temp_y = current_location.y;
-
-        // Directly above and below.
-        temp_y++;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        temp_y -= 2;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        // Drop torch to the right.
-        temp_x++;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        temp_y++;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        temp_y++;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        // Drop torch to the left.
-        temp_x -=2;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        temp_y--;
-        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
-            return true;
-        }
-
-        temp_y--;
-        return tryToThrowTorch(new Location(temp_x, temp_y));
-    }
-
-    /**
-     * Helper function for drop torch.
-     * @param location to throw torch
-     * @return whether or not torch was able to be thrown
-     */
-    private boolean tryToThrowTorch(Location location) {
-        if (uc.canThrowTorch(location)) {
-            uc.throwTorch(location);
-            return true;
-        }
-        return false;
-    }
-
     // Move adjacent to building location and place a building there. Choose a different build location if a building
     // has already been placed. If a unit that is not a building is currently on the location, wait until it moves.
-    // TODO prevent workers from waiting too long to place a building
     void spawnBuilding() {
         // Only switch off of building mode if there are no buildings to place
         if (!buildingLocations.isEmpty()) {
@@ -426,7 +346,6 @@ public class Worker extends MyUnit {
      *
      */
     void mine() {
-        // TODO come up with better mechanism for units to deposit
         // For now, if workers fills up on one resource, they go back to base.
         int maxResourcesCarried = max(uc.getResourcesCarried());
 
@@ -499,14 +418,37 @@ public class Worker extends MyUnit {
 
         // If no resource locations stored, just explore.
         if (found_resources.isEmpty()) {
-            moveRandom();
-            //explore();
+            explore();
             return;
         }
 
-        // If the list of found locations is not empty and a location isn't set, set target location to the first one
+        // If the list of found locations is not empty and a location isn't set, set target location to the closest one
         // in the resource_list.
-        currentFoundResourceIndex = 0;
+        int closestResourceDistanceSquared = Integer.MAX_VALUE;
+        int distanceSquared;
+        int closestLocationIndex = 0;
+
+        for (int i = 0; i < found_resources.size(); i++) {
+            distanceSquared = uc.getLocation().distanceSquared(found_resources.get(i).location);
+            if (distanceSquared < closestResourceDistanceSquared) {
+                closestResourceDistanceSquared = distanceSquared;
+                closestLocationIndex = i;
+            }
+        }
+        currentFoundResourceIndex = closestLocationIndex;
+
         bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false);
     }
+
+    private void explore() {
+        int tries = 8;
+        while (this.uc.canMove() && tries-- > 0) {
+            if (this.uc.canMove(this.currentDir)) {
+                this.uc.move(this.currentDir);
+            } else {
+                this.currentDir = this.currentDir.rotateRight().rotateRight();
+            }
+        }
+    }
 }
+

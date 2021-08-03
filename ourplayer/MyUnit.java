@@ -320,4 +320,90 @@ public abstract class MyUnit {
 
         return false;
     }
+
+    /**
+     * When torch is almost finished, throw it on an adjacent square and light another torch with it.
+     */
+    void keepTorchLit() {
+        int torchRounds = uc.getInfo().getTorchRounds();
+        // Light torch when spawned.
+        if (torchRounds == 0) {
+            if (uc.canLightTorch())
+                uc.lightTorch();
+        }
+        // After initial torch light, throw torch on ground and light a new one when the torch is almost depleted.
+        // TODO: Check limit
+        else if (torchRounds <= 5) {
+            if (dropTorch())
+                if (uc.canLightTorch()) {
+                    uc.lightTorch();
+                }
+                else
+                    uc.println("SOMEHOW TORCH CAN NOT BE LIT");
+        }
+    }
+
+    /**
+     * Attempt to throw the unit's torch at an adjacent tile.
+     * @return whether or not unit was able to throw a torch on an adjacent tile
+     */
+    private boolean dropTorch() {
+        Location current_location = uc.getLocation();
+        int temp_x = current_location.x;
+        int temp_y = current_location.y;
+
+        // Directly above and below.
+        temp_y++;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        temp_y -= 2;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        // Drop torch to the right.
+        temp_x++;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        temp_y++;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        temp_y++;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        // Drop torch to the left.
+        temp_x -=2;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        temp_y--;
+        if (tryToThrowTorch(new Location(temp_x, temp_y))) {
+            return true;
+        }
+
+        temp_y--;
+        return tryToThrowTorch(new Location(temp_x, temp_y));
+    }
+
+    /**
+     * Helper function for drop torch.
+     * @param location to throw torch
+     * @return whether or not torch was able to be thrown
+     */
+    private boolean tryToThrowTorch(Location location) {
+        if (uc.canThrowTorch(location)) {
+            uc.throwTorch(location);
+            return true;
+        }
+        return false;
+    }
 }
