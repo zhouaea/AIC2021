@@ -9,10 +9,13 @@ public class Base extends MyUnit {
     int workers = 0;
     int explorers = 0;
     final int MAX_WORKERS = 5;
-    final int MAX_EXPLORERS = 0;
+    final int MAX_EXPLORERS = 1;
 
     Team team = uc.getTeam();
     Team enemy_team = uc.getOpponent();
+
+    final int WATER_TILE_THRESHOLD = 15;
+    boolean waterMode = false;
 
     final int MAX_BUILDINGS_PLACED = 20;
     boolean hasCalculatedBuildingLocations = false;
@@ -24,17 +27,27 @@ public class Base extends MyUnit {
         super(uc);
     }
 
+    // TODO If base sees traps, spawn trapper
     void playRound(){
-        spawnTroops();
+        checkForWater();
         playDefense();
-        senseEnemies();
-        senseResources();
+        spawnTroops();
         researchTech(); // TODO change research path based on different states like "normal", "water", etc.
         sendBuildingLocations();
 
 
         uc.println("energy used: " + uc.getEnergyUsed());
         uc.println("energy left: " + uc.getEnergyLeft());
+    }
+
+    void checkForWater() {
+        if (uc.getRound() == 0) {
+            Location[] waterTiles = uc.senseWater(50);
+            if (waterTiles.length >= WATER_TILE_THRESHOLD) {
+                waterMode = true;
+                uc.println("water mode activated");
+            }
+        }
     }
 
     void playDefense() {
@@ -80,17 +93,31 @@ public class Base extends MyUnit {
     }
 
     private void researchTechLevel0() {
-        if (uc.canResearchTechnology(Technology.UTENSILS)) {
-            uc.researchTechnology(Technology.UTENSILS);
-            return;
-        }
-        if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.UTENSILS, team)) {
-            uc.researchTechnology(Technology.MILITARY_TRAINING);
-            return;
-        }
-        if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.UTENSILS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
-            uc.researchTechnology(Technology.BOXES);
-            return;
+        if (waterMode) {
+            if (uc.canResearchTechnology(Technology.RAFTS)) {
+                uc.researchTechnology(Technology.RAFTS);
+                return;
+            }
+
+            if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.RAFTS, team)) {
+                uc.researchTechnology(Technology.MILITARY_TRAINING);
+                return;
+            }
+            if (uc.canResearchTechnology(Technology.UTENSILS) && uc.hasResearched(Technology.RAFTS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+                uc.researchTechnology(Technology.UTENSILS);
+            }
+        } else {
+            if (uc.canResearchTechnology(Technology.UTENSILS)) {
+                uc.researchTechnology(Technology.UTENSILS);
+                return;
+            }
+            if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.UTENSILS, team)) {
+                uc.researchTechnology(Technology.MILITARY_TRAINING);
+                return;
+            }
+            if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.UTENSILS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+                uc.researchTechnology(Technology.BOXES);
+            }
         }
     }
 
@@ -107,14 +134,22 @@ public class Base extends MyUnit {
 
         if (uc.canResearchTechnology(Technology.COOKING) && uc.hasResearched(Technology.TACTICS, team) && uc.hasResearched(Technology.JOBS, team)) {
             uc.researchTechnology(Technology.COOKING);
-            return;
         }
     }
 
     private void researchTechLevel2() {
-        if (uc.canResearchTechnology(Technology.SCHOOLS)) {
-            uc.researchTechnology(Technology.SCHOOLS);
+        if (uc.canResearchTechnology(Technology.CRYSTALS)) {
+            uc.researchTechnology(Technology.CRYSTALS);
             return;
+        }
+
+        if (uc.canResearchTechnology(Technology.COMBUSTION)) {
+            uc.researchTechnology(Technology.COMBUSTION);
+            return;
+        }
+
+        if (uc.canResearchTechnology(Technology.POISON)) {
+            uc.researchTechnology(Technology.POISON);
         }
     }
 
