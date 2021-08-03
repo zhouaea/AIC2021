@@ -15,7 +15,7 @@ public abstract class MyUnit {
     final int WOOD = 1;
     final int STONE = 2;
     final int FOOD = 3;
-    final int DEER = 4;
+    final int PLACEHOLDER_1 = 4;
     final int ENEMY_WORKER = 5;
     final int ENEMY_EXPLORER = 6;
     final int ENEMY_TRAPPER = 7;
@@ -24,9 +24,9 @@ public abstract class MyUnit {
     final int ENEMY_WOLF = 10;
     final int ENEMY_SETTLEMENT = 11;
     final int ENEMY_BARRACKS = 12;
-    final int ENEMY_FARM = 13;
-    final int ENEMY_SAWMILL = 14;
-    final int ENEMY_QUARRY = 15;
+    final int ENEMY_RESOURCE_BUILDING = 13;
+    final int BUILDING_LOCATION = 14;
+    final int PLACEHOLDER_2 = 15;
 
     final int teamIdentifier = 74;
 
@@ -87,6 +87,12 @@ public abstract class MyUnit {
             return true;
         }
         return false;
+    }
+
+
+    // TODO We can verify that the smoke signal is ours by making sure that unit code 14's have unit amount 0.
+    int encodeBuildingLocation(Location buildingLocation) {
+        return encodeSmokeSignal(buildingLocation, BUILDING_LOCATION, 0);
     }
 
     int encodeResourceMessage(ResourceInfo resourceInfo) {
@@ -285,21 +291,26 @@ public abstract class MyUnit {
      * @param destination
      * @return true if at location, false if still moving towards it.
      */
-    boolean bug2(Location currentLocation, Location destination) {
+    // TODO Avoid tiles within enemy attack radiuses and traps (for workers and explorers). Avoid the vision range of the base once location is known.
+    boolean bug2(Location currentLocation, Location destination, boolean adjacentDestination) {
         if (!uc.canMove())
             return false;
 
-        if (destinationIsReached(currentLocation, destination)) {
+        if (destinationIsReached(currentLocation, destination, adjacentDestination)) {
             uc.println("destination reached");
             closestLocation = null;
             return true;
         }
 
-        uc.drawLineDebug(closestLocation, destination, 255, 255, 255);
+        // Show line from closest location to the destination when clicking on unit.
+        if (closestLocation != null)
+            uc.drawLineDebug(closestLocation, destination, 255, 255, 255);
+
+        if (closestLocation != null)
+            uc.println("closest location: " + closestLocation);
 
         // If the bot is on the closest location it has been in, attempt to move in a straight line from location to destination.
         if (closestLocation == null || currentLocation.distanceSquared(destination) < closestLocation.distanceSquared(destination)) {
-            uc.println("closest location");
             closestLocation = currentLocation;
             bugDirection = currentLocation.directionTo(destination);
             uc.move(bugDirection);
@@ -328,21 +339,33 @@ public abstract class MyUnit {
         }
 
         // Rotate 90 degrees left each turn to "push against the wall" and catch a potential curve of the wall.
-        uc.println("rotated left");
         bugDirection = bugDirection.rotateLeft();
         bugDirection = bugDirection.rotateLeft();
     }
 
-    boolean destinationIsReached(Location currentLocation, Location destination) {
-        // If pathfinding to base, set the destination to be at an adjacent tile.
-        if (uc.senseUnitAtLocation(destination) != null && uc.senseUnitAtLocation(destination).getType() == UnitType.BASE) {
-            uc.println("base sensed");
-            for (Direction dir : dirs) {
-                Location alternative = destination.add(dir);
-                if (currentLocation.isEqual(alternative)) {
-                    uc.println("base reached");
-                    destination = alternative;
-                    break;
+    boolean destinationIsReached(Location currentLocation, Location destination, boolean adjacentDestination) {
+        // If pathfinding to a location adjacent to the destination, set the destination to be at an adjacent tile.
+        if (adjacentDestination) {
+            // If unit is on the destination instead of being adjacent to it, move to an adjacent tile, and the
+            // destination is now reached.
+            if (uc.getLocation().isEqual(destination)) {
+                for (Direction dir : dirs) {
+                    Location alternative = destination.add(dir);
+                    if (uc.canMove(dir)) {
+                        uc.move(dir);
+                        return true;
+                    }
+                }
+                // Otherwise, the destination is reached when the unit steps on a tile adjacent to the destination.
+            } else {
+                uc.println("base sensed");
+                for (Direction dir : dirs) {
+                    Location alternative = destination.add(dir);
+                    if (currentLocation.isEqual(alternative)) {
+                        uc.println("base reached");
+                        destination = alternative;
+                        break;
+                    }
                 }
             }
         }

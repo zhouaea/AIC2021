@@ -1,5 +1,6 @@
 package ourplayer;
 
+
 import aic2021.user.Location;
 import aic2021.user.Team;
 import aic2021.user.UnitController;
@@ -17,14 +18,15 @@ public class Axeman extends MyUnit {
   Team deerTeam = Team.NEUTRAL;
 
   Location baseLocation = null;
+  int zoneMaxX;
+  int zoneMinX;
+  int zoneMaxY;
+  int zoneMinY;
 
-  UnitInfo target = null;
   Location currentTargetLocation;
 
-  int targetID;
 
   boolean fighting = false;
-  boolean targetLocked = false;
 
   void playRound() {
     // remember base location
@@ -35,25 +37,19 @@ public class Axeman extends MyUnit {
     this.keepTorchLit();
 
     this.senseEnemies();
+
     if (fighting) {
       this.attack();
+    } else {
+      // if not in zone
+      if (!this.inZone(this.uc.getLocation())) {
+        // return to base
+        bug2(uc.getLocation(), this.baseLocation, true);
+      } else {
+        // move randomly in zone
+        this.moveRandomInZone();
+      }
     }
-    this.moveRandom();
-
-    //    // find target
-    //    if (this.target == null) {
-    //      for (UnitInfo target : this.uc.senseUnits(this.ourTeam.getOpponent())) {
-    //        this.target = target;
-    //        this.targetID = this.target.getID();
-    //        break;
-    //      }
-    //    }
-    //
-    //    // attack
-    //    this.attack();
-    //
-    //    // light torch
-    //    this.keepTorchLit();
   }
 
   void rememberBaseLocation() {
@@ -61,30 +57,9 @@ public class Axeman extends MyUnit {
     for (UnitInfo unit : surroundingUnits) {
       if (unit.getType() == UnitType.BASE) {
         this.baseLocation = unit.getLocation();
+        this.calculateZone();
       }
     }
-  }
-
-  //  void attack() {
-  //    if (this.uc.canAttack(this.target.getLocation())) {
-  //      this.fighting = true;
-  //      // if enemy is killed, remove it
-  //      if (this.target.getHealth() <= 15) {
-  //        this.target = null;
-  //      }
-  //      this.uc.attack(this.target.getLocation());
-  //    }
-  //  }
-
-  void followTarget() {
-    // find target again, track location
-    for (UnitInfo target : this.uc.senseUnits(this.enemyTeam)) {
-      if (target.getID() == this.targetID) {
-        this.target = target;
-        this.targetLocked = true;
-      }
-    }
-    if (this.uc.canMove()) {}
   }
 
   void senseEnemies() {
@@ -93,16 +68,10 @@ public class Axeman extends MyUnit {
     if (enemies.length != 0) {
       currentTargetLocation = enemies[0].getLocation();
       fighting = true;
-      bug2(uc.getLocation(), enemies[0].getLocation());
     } else {
-      UnitInfo[] deer = uc.senseUnits(deerTeam);
-
-      if (deer.length != 0) {
-        currentTargetLocation = deer[0].getLocation();
-        fighting = true;
-        bug2(uc.getLocation(), deer[0].getLocation());
-      } else {
+      if (fighting) {
         fighting = false; // Enemy was killed
+        closestLocation = null; // Reset pathfinding manually after axeman is done chasing enemy
       }
     }
   }
@@ -112,10 +81,36 @@ public class Axeman extends MyUnit {
       uc.attack(currentTargetLocation);
     }
 
-    bug2(uc.getLocation(), currentTargetLocation);
+    bug2(uc.getLocation(), currentTargetLocation, true);
 
     if (uc.canAttack(currentTargetLocation)) {
       uc.attack(currentTargetLocation);
     }
+  }
+
+  boolean moveRandomInZone() {
+    int tries = 10;
+    while (uc.canMove() && tries-- > 0) {
+      int random = (int) (uc.getRandomDouble() * 8);
+      if (uc.canMove(dirs[random]) && this.inZone(uc.getLocation().add(dirs[random]))) {
+        uc.move(dirs[random]);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  boolean inZone(Location location) {
+    return location.x <= this.zoneMaxX
+        && location.x >= this.zoneMinX
+        && location.y <= this.zoneMaxY
+        && location.y >= this.zoneMinY;
+  }
+
+  void calculateZone() {
+    this.zoneMaxX = this.baseLocation.x + 8;
+    this.zoneMinX = this.baseLocation.x - 8;
+    this.zoneMaxY = this.baseLocation.y + 8;
+    this.zoneMinY = this.baseLocation.y - 8;
   }
 }

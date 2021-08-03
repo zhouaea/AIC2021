@@ -11,43 +11,49 @@ import aic2021.user.UnitInfo;
 import aic2021.user.UnitType;
 
 public class Base extends MyUnit {
-
   int workers = 0;
   int explorers = 0;
+  final int MAX_WORKERS = 5;
+  final int MAX_EXPLORERS = 1;
+  ArrayList<Integer> messages = new ArrayList<>();
+
+
   Team team = uc.getTeam();
   Team enemy_team = uc.getOpponent();
 
-  ArrayList<Integer> messages = new ArrayList<>();
+  final int MAX_BUILDINGS_PLACED = 20;
+  boolean hasCalculatedBuildingLocations = false;
+  ArrayList<Location> buildingLocations = new ArrayList<>();
+  int buildingLocationsAdded = 0;
+  int buildingLocationIndex = 0;
 
-  Base(UnitController uc) {
+  Base(UnitController uc){
     super(uc);
   }
 
-  void playRound() {
+  void playRound(){
     spawnTroops();
     playDefense();
     senseEnemies();
     senseResources();
-    researchTech();
+    researchTech(); // TODO change research path based on different states like "normal", "water", etc.
+    sendBuildingLocations();
 
-    // read and record smoke signals
-    if (this.uc.canReadSmokeSignals()) {
-      int[] signals = this.uc.readSmokeSignals();
-      for (int signal : signals) {
-        this.messages.add(signal);
+
+    uc.println("energy used: " + uc.getEnergyUsed());
+    uc.println("energy left: " + uc.getEnergyLeft());
+
+      // read and record smoke signals
+      if (this.uc.canReadSmokeSignals()) {
+        int[] signals = this.uc.readSmokeSignals();
+        for (int signal : signals) {
+          this.messages.add(signal);
+        }
+        if (signals.length > 0) {
+          this.uc.println(
+                  "Base received " + signals.length + " signals: First signal is: " + signals[0]);
+        }
       }
-      if (signals.length > 0) {
-        this.uc.println(
-            "Base received " + signals.length + " signals: First signal is: " + signals[0]);
-      }
-    }
-
-    // It would be nice to sense terrain round 0 if we can.
-    //        if (uc.getRound() == 0)
-    //            senseTerrain();
-
-    //        uc.println("energy used: " + uc.getEnergyUsed());
-    //        uc.println("energy left: " + uc.getEnergyLeft());
   }
 
   void playDefense() {
@@ -62,8 +68,7 @@ public class Base extends MyUnit {
 
   void senseEnemies() {
     // Sense enemy units in vision radius and alert team of how many are attacking and what kind.
-    // Prioritize: enemy base -> scouts -> buildings -> wolves -> axemen -> spearmen -> workers ->
-    // trappers
+    // Prioritize: enemy base -> scouts -> buildings -> wolves -> axemen -> spearmen -> workers -> trappers
     // UnitInfo[] enemies = uc.senseUnits(enemy_team);
 
   }
@@ -77,13 +82,19 @@ public class Base extends MyUnit {
   }
 
   void researchTech() {
-    if (uc.getTechLevel(team) == 0) researchTechLevel0();
+    if (uc.getTechLevel(team) == 0)
+      researchTechLevel0();
     else {
-      if (workers < 1) spawnRandom(UnitType.WORKER);
+      if (workers < 1)
+        spawnRandom(UnitType.WORKER);
 
-      if (uc.getTechLevel(team) == 1) researchTechLevel1();
-      else if (uc.getTechLevel(team) == 2) researchTechLevel2();
-      else if (uc.canResearchTechnology(Technology.WHEEL)) uc.researchTechnology(Technology.WHEEL);
+      if (uc.getTechLevel(team) == 1)
+        researchTechLevel1();
+      else if (uc.getTechLevel(team) == 2)
+        researchTechLevel2();
+      else
+      if (uc.canResearchTechnology(Technology.WHEEL))
+        uc.researchTechnology(Technology.WHEEL);
     }
   }
 
@@ -92,14 +103,11 @@ public class Base extends MyUnit {
       uc.researchTechnology(Technology.UTENSILS);
       return;
     }
-    if (uc.canResearchTechnology(Technology.MILITARY_TRAINING)
-        && uc.hasResearched(Technology.UTENSILS, team)) {
+    if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.UTENSILS, team)) {
       uc.researchTechnology(Technology.MILITARY_TRAINING);
       return;
     }
-    if (uc.canResearchTechnology(Technology.BOXES)
-        && uc.hasResearched(Technology.UTENSILS, team)
-        && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+    if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.UTENSILS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
       uc.researchTechnology(Technology.BOXES);
       return;
     }
@@ -116,9 +124,7 @@ public class Base extends MyUnit {
       return;
     }
 
-    if (uc.canResearchTechnology(Technology.COOKING)
-        && uc.hasResearched(Technology.TACTICS, team)
-        && uc.hasResearched(Technology.JOBS, team)) {
+    if (uc.canResearchTechnology(Technology.COOKING) && uc.hasResearched(Technology.TACTICS, team) && uc.hasResearched(Technology.JOBS, team)) {
       uc.researchTechnology(Technology.COOKING);
       return;
     }
@@ -132,19 +138,62 @@ public class Base extends MyUnit {
   }
 
   void spawnTroops() {
-    if (explorers < 1) {
-      if (spawnRandom(UnitType.EXPLORER)) explorers++;
+    if (explorers < MAX_EXPLORERS) {
+      if (spawnRandom(UnitType.EXPLORER))
+        explorers++;
     }
 
-    if (workers < 5) {
-      if (spawnRandom(UnitType.WORKER)) workers++;
+    if (workers < MAX_WORKERS) {
+      if (spawnRandom(UnitType.WORKER))
+        workers++;
     }
-    uc.println("workers");
   }
 
+  // TODO send smoke signals to workers about resources in range
   void senseTerrain() {
     // Sense terrain in range, and maybe let troops know about important spots.
     Location[] water_tiles = uc.senseWater(50);
     Location[] mountain_tiles = uc.senseMountains(50);
+  }
+
+
+  void sendBuildingLocations() {
+    if (!hasCalculatedBuildingLocations) {
+      calculateBuildingLocations();
+    }
+
+    // Send a building location to all workers when possible.
+    if (uc.canMakeSmokeSignal() && buildingLocationIndex < buildingLocations.size()) {
+      uc.makeSmokeSignal(encodeBuildingLocation(buildingLocations.get(buildingLocationIndex)));
+      buildingLocationIndex++;
+      uc.println("Building Location Sent");
+    }
+  }
+
+  private void calculateBuildingLocations() {
+    Location baseLocation = uc.getLocation();
+    int base_x_parity = baseLocation.x % 2;
+    int base_y_parity = baseLocation.y % 2;
+
+    Location[] visibleLocations = uc.getVisibleLocations();
+    for (Location location : visibleLocations) {
+      // Limit the number of buildings that will be placed.
+      if (buildingLocationsAdded > MAX_BUILDINGS_PLACED) {
+        break;
+      }
+
+      // Building location is not the base location
+      if (!location.isEqual(baseLocation)) {
+        // Building locations must be part of the lattice structure.
+        if ((location.x % 2 == base_x_parity && location.y % 2 == base_y_parity) || location.x % 2 != base_x_parity && location.y % 2 != base_y_parity) {
+          // Only select locations where buildings can be placed.
+          if (!uc.hasMountain(location) && !uc.hasWater(location) && !uc.isOutOfMap(location)) {
+            buildingLocations.add(location);
+            buildingLocationsAdded++;
+          }
+        }
+      }
+    }
+    hasCalculatedBuildingLocations = true;
   }
 }
