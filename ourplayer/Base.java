@@ -17,11 +17,11 @@ public class Base extends MyUnit {
     final int WATER_TILE_THRESHOLD = 15;
     boolean waterMode = false;
 
-    final int MAX_BUILDINGS_PLACED = 20;
-    boolean hasCalculatedBuildingLocations = false;
-    ArrayList<Location> buildingLocations = new ArrayList<>();
-    int buildingLocationsAdded = 0;
     int buildingLocationIndex = 0;
+
+    boolean hasAssignedWorkerAsBuilder = false;
+    int builderId = 0;
+    boolean hasToldBuilderAllLocationsAreSent = false;
 
     Base(UnitController uc){
         super(uc);
@@ -174,42 +174,36 @@ public class Base extends MyUnit {
 
 
     void sendBuildingLocations() {
-        if (!hasCalculatedBuildingLocations) {
-            calculateBuildingLocations();
-        }
-
-        // Send a building location to all workers when possible.
-        if (uc.canMakeSmokeSignal() && buildingLocationIndex < buildingLocations.size()) {
-            uc.makeSmokeSignal(encodeBuildingLocation(buildingLocations.get(buildingLocationIndex)));
-            buildingLocationIndex++;
-            uc.println("Building Location Sent");
+        if (uc.hasResearched(Technology.JOBS, team)) {
+            if (!hasAssignedWorkerAsBuilder) {
+                makeBuilder();
+            }
         }
     }
 
-    private void calculateBuildingLocations() {
-        Location baseLocation = uc.getLocation();
-        int base_x_parity = baseLocation.x % 2;
-        int base_y_parity = baseLocation.y % 2;
+    /**
+     * Spawn a worker, get its id, and tell it to enter building mode.
+     */
+    private void makeBuilder() {
+        // Cannot proceed unless worker is built.
+        if (!spawnRandom(UnitType.WORKER)) {
+            return;
+        }
 
-        Location[] visibleLocations = uc.getVisibleLocations();
-        for (Location location : visibleLocations) {
-            // Limit the number of buildings that will be placed.
-            if (buildingLocationsAdded > MAX_BUILDINGS_PLACED) {
+        UnitInfo[] allyUnits = uc.senseUnits(2, team);
+        for (UnitInfo unit : allyUnits) {
+            if (unit.getType() == UnitType.WORKER) {
+                builderId = unit.getID();
                 break;
             }
-
-            // Building location is not the base location
-            if (!location.isEqual(baseLocation)) {
-                // Building locations must be part of the lattice structure.
-                if ((location.x % 2 == base_x_parity && location.y % 2 == base_y_parity) || location.x % 2 != base_x_parity && location.y % 2 != base_y_parity) {
-                    // Only select locations where buildings can be placed.
-                    if (!uc.hasMountain(location) && !uc.hasWater(location) && !uc.isOutOfMap(location)) {
-                        buildingLocations.add(location);
-                        buildingLocationsAdded++;
-                    }
-                }
-            }
         }
-        hasCalculatedBuildingLocations = true;
+
+        // Builder is not assigned until smoke signal is sent.
+        if (uc.canMakeSmokeSignal()) {
+            uc.println(builderId);
+            uc.makeSmokeSignal(encodeSmokeSignal(builderId, ASSIGN_BUILDER, 1));
+            hasAssignedWorkerAsBuilder = true;
+            uc.println("worker is now a builder");
+        }
     }
 }

@@ -1,6 +1,5 @@
 package ourplayer;
 
-import aic2021.engine.Unit;
 import aic2021.user.*;
 import java.util.ArrayList;
 
@@ -14,9 +13,17 @@ public class Worker extends MyUnit {
     Team deerTeam = Team.NEUTRAL;
 
     ArrayList<ResourceInfo> found_resources = new ArrayList<>(); //ArrayList instead of queue in case we want to prioritize certain resources
+    ArrayList<ResourceInfo> low_priority_resources = new ArrayList<>();
     ArrayList<ResourceInfo> messagesToSend = new ArrayList<>();
     int currentFoundResourceIndex = -1;
     final int MAX_RESOURCES_TO_REMEMBER = 5;
+
+    final int RESOURCE_THRESHOLD_FOR_SETTLEMENT = 300;
+
+    final int MAX_BUILDINGS_PLACED = 20;
+    boolean hasCalculatedBuildingLocations = false;
+    ArrayList<Location> buildingLocations = new ArrayList<>();
+    int buildingLocationsAdded = 0;
 
     boolean isHunting = false;
     Location currentDeerLocation;
@@ -24,7 +31,6 @@ public class Worker extends MyUnit {
     boolean isMining = false;
 
     boolean isBuilding = false;
-    ArrayList<Location> buildingLocations = new ArrayList<>();
 
     boolean isDepositing = false;
     boolean knowsPlaceToDeposit = false;
@@ -38,10 +44,9 @@ public class Worker extends MyUnit {
 
     void playRound(){
         // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
-        // TODO Build settlements near far away resources
-        // TODO Have the base call upon one worker to build buildings
-        // TODO Seperate found locations with broadcasted locations, so broadcasted has lower priority
-        // TODO Prioritize specific resources?
+        // TODO use DFS for builder pathfinding instead of bug2, since bug2 will go around entire map to reach location sometimes
+        // TODO Have worker build a barrack for its first building
+        // TODO come up with faster way for builder to place buildings along lattice structure
         // If just created, store team's base location.
         if (!knowsPlaceToDeposit) {
             rememberBaseLocation();
@@ -97,7 +102,7 @@ public class Worker extends MyUnit {
     }
 
     /**
-     * If a smoke signal is from an ally and is for a resource location, add the encoded resource to found_resources.
+     * If a smoke signal is from an ally and is for a resource location, add the encoded resource to broadcasted_resources.
      * Alternatively, if the signal is for a building location, add the encoded location to buildingLocations.
      */
     private void decodeMessages() {
@@ -107,47 +112,70 @@ public class Worker extends MyUnit {
 
         for (int smokeSignal : smokeSignals) {
             message = decodeSmokeSignal(currentLocation, smokeSignal);
-            if (message != null)
+            if (message != null) {
                 if (message.unitCode == WOOD)
-                    found_resources.add(new ResourceInfo(Resource.WOOD, message.unitAmount, message.location));
+                    low_priority_resources.add(new ResourceInfo(Resource.WOOD, message.unitAmount, message.location));
                 else if (message.unitCode == STONE)
-                    found_resources.add(new ResourceInfo(Resource.STONE, message.unitAmount, message.location));
+                    low_priority_resources.add(new ResourceInfo(Resource.STONE, message.unitAmount, message.location));
                 else if (message.unitCode == FOOD)
-                    found_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
+                    low_priority_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
                 else if (message.unitCode == BUILDING_LOCATION) {
                     buildingLocations.add(message.location);
                     uc.println("building location received");
+                } else if (message.unitCode == ASSIGN_BUILDER) {
+                    int unitId = message.unitId;
+
+                    // If the assign builder message refers to the worker's id, they are the designated builder.
+                    uc.println("Decoded id : " + unitId);
+                    if (uc.getInfo().getID() == unitId) {
+                        isBuilding = true;
+                    }
                 }
+            }
         }
     }
 
     void senseResources() {
-        if (currentFoundResourceIndex > -1) {
-            Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
-
-            // If the target resource location can be sensed and has no resources or another worker is currently
-            // on the resource, a new target needs to be found.
-            if (locationHasNoResources(currentResourceLocation) || locationHasAnotherWorker(currentResourceLocation)) {
-                found_resources.remove(currentFoundResourceIndex);
-                currentFoundResourceIndex = -1;
-                closestLocation = null; // Reset pathfinding manually after worker changes target.
-            }
-        }
+        // If there is a deposit in range that is closer than the current deposit, set a new deposit location.
+        updateDeposit();
 
         // If sensed resources haven't been added yet, add them to the list, and if there is a large amount of
         // resources, save it as a message to send.
+        int resourceInArea = 0;
         ResourceInfo[] resources = uc.senseResources();
         for (ResourceInfo resource : resources) {
+            resourceInArea += resource.amount;
             if (found_resources.size() <= MAX_RESOURCES_TO_REMEMBER) {
                 if (!alreadyRecordedResource(resource)) {
                     if (!locationHasAnotherWorker(resource.location)) {
                         found_resources.add(resource);
                     }
 
-                    if (resource.amount >= 100) {
+                    if (resource.amount >= 200) {
                         messagesToSend.add(resource);
                     }
                 }
+            }
+        }
+
+        // If the total amount of resources in sight exceeds 300, build a settlement, if a deposit isn't nearby.
+        if (resourceInArea >= RESOURCE_THRESHOLD_FOR_SETTLEMENT && !checkForDeposit()) {
+            spawnRandom(UnitType.SETTLEMENT);
+        }
+
+        // If the worker is set on a resource target
+        if (currentFoundResourceIndex > -1) {
+            // Constantly adapt resource target to the resource closest to the worker.
+            currentFoundResourceIndex = findClosestResourceIndex();
+            uc.println("size of found resources: " + found_resources.size());
+
+            Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
+            // If the target resource location can be sensed and has no resources or another worker is currently
+            // on the resource, a new target needs to be found.
+            if (locationHasNoResources(currentResourceLocation) || locationHasAnotherWorker(currentResourceLocation)) {
+                found_resources.remove(currentFoundResourceIndex);
+                currentFoundResourceIndex = -1;
+                closestLocation = null; // Reset pathfinding manually after worker changes target.
             }
         }
     }
@@ -197,6 +225,30 @@ public class Worker extends MyUnit {
         return loc1.x == loc2.x && loc1.y == loc2.y;
     }
 
+    private void updateDeposit() {
+        UnitInfo[] unitsNearby = uc.senseUnits();
+        for (UnitInfo unit : unitsNearby) {
+            if (unit.getTeam() == team) {
+                if (unit.getType() == UnitType.SETTLEMENT)
+                    if (uc.getLocation().distanceSquared(unit.getLocation()) < uc.getLocation().distanceSquared(depositLocation)) {
+                        depositLocation = unit.getLocation();
+                    }
+            }
+        }
+    }
+
+    private boolean checkForDeposit() {
+        UnitInfo[] unitsNearby = uc.senseUnits();
+        for (UnitInfo unit : unitsNearby) {
+            if (unit.getTeam() == team) {
+                if (unit.getType() == UnitType.SETTLEMENT || unit.getType() == UnitType.BASE)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * If deer is/are found, engage in hunting mode on the closest one in sight.
      */
@@ -217,7 +269,10 @@ public class Worker extends MyUnit {
     // Move adjacent to building location and place a building there. Choose a different build location if a building
     // has already been placed. If a unit that is not a building is currently on the location, wait until it moves.
     void spawnBuilding() {
-        // Only switch off of building mode if there are no buildings to place
+        if (!hasCalculatedBuildingLocations) {
+            calculateBuildingLocations();
+        }
+
         if (!buildingLocations.isEmpty()) {
             Location currentBuildingLocation = buildingLocations.get(0);
             uc.println("current building location: " + currentBuildingLocation);
@@ -231,7 +286,7 @@ public class Worker extends MyUnit {
             else if (bug2(uc.getLocation(), currentBuildingLocation, true)) {
                 Direction directionToBuilding = uc.getLocation().directionTo(currentBuildingLocation);
 
-                int buildingType = (int)(uc.getRandomDouble() * 3);
+                int buildingType = (int) (uc.getRandomDouble() * 3);
                 if (buildingType == 0 && uc.canSpawn(UnitType.FARM, directionToBuilding)) {
                     uc.spawn(UnitType.FARM, directionToBuilding);
                 } else if (buildingType == 1 && uc.canSpawn(UnitType.SAWMILL, directionToBuilding)) {
@@ -266,6 +321,34 @@ public class Worker extends MyUnit {
         return true;
     }
 
+    private void calculateBuildingLocations() {
+        Location baseLocation = depositLocation;
+        int base_x_parity = baseLocation.x % 2;
+        int base_y_parity = baseLocation.y % 2;
+
+        Location[] visibleLocations = uc.getVisibleLocations();
+        for (Location location : visibleLocations) {
+            // Limit the number of buildings that will be placed.
+            if (buildingLocationsAdded > MAX_BUILDINGS_PLACED) {
+                break;
+            }
+
+            // Building location is not the base location
+            if (!location.isEqual(baseLocation)) {
+                // Building locations must be part of the lattice structure.
+                if ((location.x % 2 == base_x_parity && location.y % 2 == base_y_parity) || location.x % 2 != base_x_parity && location.y % 2 != base_y_parity) {
+                    // Only select locations where buildings can be placed.
+                    if (!uc.hasMountain(location) && !uc.hasWater(location) && !uc.isOutOfMap(location)) {
+                        buildingLocations.add(location);
+                        buildingLocationsAdded++;
+                    }
+                }
+            }
+        }
+        hasCalculatedBuildingLocations = true;
+        uc.println("building locations: " + buildingLocations);
+    }
+
     /**
      * Attempt to attack and move to deer in vision radius.
      */
@@ -292,18 +375,18 @@ public class Worker extends MyUnit {
                 uc.deposit();
                 isDepositing = false;
 
-                if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
-                    // Ensure that one barrack is placed near the unit's deposit location once barracks are unlocked.
-                    if (!checkForBarrack())
-                        spawnBarrack();
-                }
+//                if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+//                    // Ensure that one barrack is placed near the unit's deposit location once barracks are unlocked.
+//                    if (!checkForBarrack())
+//                        spawnBarrack();
+//                }
 
-                // TODO activate building mode if the base is in the worker's vision range?
-                // Once worker has deposited resources, jobs is unlocked, and it has a build location, isBuilding = true.
-                if (uc.hasResearched(Technology.JOBS, team) && !buildingLocations.isEmpty()) {
-                    isBuilding = true;
-                    uc.println("switching to building mode");
-                }
+//                // TODO activate building mode if the base is in the worker's vision range?
+//                // Once worker has deposited resources, jobs is unlocked, and it has a build location, isBuilding = true.
+//                if (uc.hasResearched(Technology.JOBS, team) && !buildingLocations.isEmpty()) {
+//                    isBuilding = true;
+//                    uc.println("switching to building mode");
+//                }
             }
         }
     }
@@ -416,14 +499,25 @@ public class Worker extends MyUnit {
             return;
         }
 
-        // If no resource locations stored, just explore.
+        // If no resource locations stored, pathfind to a broadcasted resource or simply explore.
         if (found_resources.isEmpty()) {
-            explore();
+            if (!low_priority_resources.isEmpty()) {
+                found_resources.add(low_priority_resources.remove(0));
+            } else {
+                explore();
+            }
             return;
         }
 
         // If the list of found locations is not empty and a location isn't set, set target location to the closest one
         // in the resource_list.
+
+        currentFoundResourceIndex = findClosestResourceIndex();
+
+        bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false);
+    }
+
+    private int findClosestResourceIndex() {
         int closestResourceDistanceSquared = Integer.MAX_VALUE;
         int distanceSquared;
         int closestLocationIndex = 0;
@@ -435,9 +529,8 @@ public class Worker extends MyUnit {
                 closestLocationIndex = i;
             }
         }
-        currentFoundResourceIndex = closestLocationIndex;
 
-        bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false);
+        return closestLocationIndex;
     }
 
     private void explore() {

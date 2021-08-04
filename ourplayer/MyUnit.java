@@ -21,7 +21,7 @@ public abstract class MyUnit {
     final int ENEMY_BARRACKS = 12;
     final int ENEMY_RESOURCE_BUILDING = 13;
     final int BUILDING_LOCATION = 14;
-    final int PLACEHOLDER_2 = 15;
+    final int ASSIGN_BUILDER = 15;
 
     final int teamIdentifier = 74;
 
@@ -79,7 +79,6 @@ public abstract class MyUnit {
         return false;
     }
 
-    // TODO We can verify that the smoke signal is ours by making sure that unit code 14's have unit amount 0.
     int encodeBuildingLocation(Location buildingLocation) {
         return encodeSmokeSignal(buildingLocation, BUILDING_LOCATION, 0);
     }
@@ -121,6 +120,25 @@ public abstract class MyUnit {
         return message;
     }
 
+    int encodeSmokeSignal(int unitID, int unitCode, int unitAmount) {
+        // Divide amount by 100 if unit is a resource.
+        if (unitCode >= WOOD && unitCode <= FOOD) {
+            unitAmount /= 100;
+        }
+
+        // Unit amount cannot pass 15.
+        if (unitAmount > 15) {
+            unitAmount = 15;
+        }
+
+        // Shift teamIdentifier 9 spaces, and shift unitAmount 5 spaces.
+        int extra_info = teamIdentifier * 512 + (unitAmount & 511) * 32 + unitCode;
+        // Shift extra info (teamIdentifier + unitAmount + unitCode) 16 spaces.
+        int message = extra_info * 128 * 128 + unitID;
+
+        return message;
+    }
+
     int encodeLocation(Location location) {
         int encodedX = location.x % 128;
         int encodedY = location.y % 128;
@@ -136,7 +154,8 @@ public abstract class MyUnit {
      * @return The contents of the message if we are 99% sure the message came from our team. Otherwise, null.
      */
     DecodedMessage decodeSmokeSignal(Location currentLocation, int codedMessage) {
-        Location location = decodeLocation(currentLocation, codedMessage);
+        // Quick fix for the case that the message is for assigning a builder.
+        int originalCodedMessage = codedMessage;
 
         // unitCode is bits 16 - 20
         codedMessage = codedMessage / 128 / 128;
@@ -153,11 +172,18 @@ public abstract class MyUnit {
         // Only decode message if we are 99% certain that the message is ours.
         DecodedMessage decodedMessage;
         if (identifier == teamIdentifier) {
-            // Convert resource amount from 4 bit version to real amount.
-            if (unitCode >= WOOD && unitCode <= FOOD) {
-                unitAmount *= 100;
+            // If this message is for assigning a builder, the location field is now used to mention a unit id.
+            if (unitCode == ASSIGN_BUILDER) {
+                int unitId = originalCodedMessage % (128 * 128);
+                decodedMessage = new DecodedMessage(unitId, unitCode, unitAmount);
+            } else {
+                Location location = decodeLocation(currentLocation, originalCodedMessage);
+                // Convert resource amount from 4 bit version to real amount.
+                if (unitCode == WOOD || unitCode == FOOD || unitCode == STONE) {
+                    unitAmount *= 100;
+                }
+                decodedMessage = new DecodedMessage(location, unitCode, unitAmount);
             }
-            decodedMessage = new DecodedMessage(location, unitCode, unitAmount);
         } else {
             decodedMessage = null;
         }
