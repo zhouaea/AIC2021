@@ -518,14 +518,14 @@ public class Worker extends MyUnit {
     bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false);
   }
 
-  //  void explore() {
-  //    int tries = 8;
-  //    while (this.uc.canMove() && tries-- > 0) {
-  //      if (this.uc.canMove(this.currentDir)) {
-  //        this.uc.move(this.currentDir);
-  //      } else {
-  //        this.currentDir = this.currentDir.rotateRight().rotateRight();
-  //      }
-  //    }
-  //  }
+//    void explore() {
+//      int tries = 8;
+//      while (this.uc.canMove() && tries-- > 0) {
+//        if (this.uc.canMove(this.currentDir)) {
+//          this.uc.move(this.currentDir);
+//        } else {
+//          this.currentDir = this.currentDir.rotateRight().rotateRight();
+//        }
+//      }
+//    }
 }

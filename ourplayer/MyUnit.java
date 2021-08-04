@@ -6,6 +6,7 @@ import aic2021.user.Direction;
 import aic2021.user.Location;
 import aic2021.user.Resource;
 import aic2021.user.ResourceInfo;
+import aic2021.user.Team;
 import aic2021.user.UnitController;
 import aic2021.user.UnitType;
 
@@ -33,6 +34,10 @@ public abstract class MyUnit {
     Direction[] dirs = Direction.values();
 
     UnitController uc;
+
+//    Team team = this.uc.getTeam();
+//    Team enemyTeam = this.uc.getOpponent();
+//    Team deerTeam = Team.NEUTRAL;
 
     Location closestLocation = null;
     Direction bugDirection = null;

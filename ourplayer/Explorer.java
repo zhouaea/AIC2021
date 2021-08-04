@@ -1,10 +1,12 @@
 package ourplayer;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import aic2021.user.Direction;
 import aic2021.user.Location;
 import aic2021.user.ResourceInfo;
+import aic2021.user.Team;
 import aic2021.user.UnitController;
 import aic2021.user.UnitInfo;
 import aic2021.user.UnitType;
@@ -27,6 +29,14 @@ public class Explorer extends MyUnit {
 
   ArrayList<Location> dangerZone = new ArrayList<>();
 
+  int enemyArmySize = 0;
+
+  HashSet<Integer> seenEnemies = new HashSet<>();
+
+  Team team = this.uc.getTeam();
+  Team enemyTeam = this.uc.getOpponent();
+  Team deerTeam = Team.NEUTRAL;
+
   Explorer(UnitController uc) {
     super(uc);
   }
@@ -43,7 +53,7 @@ public class Explorer extends MyUnit {
       int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
       this.uc.makeSmokeSignal(signal);
       this.uc.println(
-              "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+          "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
       this.sentSignal = true;
     }
 
@@ -54,13 +64,32 @@ public class Explorer extends MyUnit {
           int signal = this.encodeResourceMessage(this.newResources.remove(0));
           this.uc.makeSmokeSignal(signal);
           this.uc.println(
-                  "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+              "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
         }
+      }
+    }
+
+    // try to send resource location smoke signal (at most every 49 rounds)
+    if (this.uc.getRound() % 49 == 0) {
+      if (this.uc.canMakeSmokeSignal()) {
+        int signal = this.enemyArmySize * 719;
+        this.uc.makeSmokeSignal(signal);
+        this.uc.println(
+            "Enemy army size smoke signal fired on round "
+                + this.uc.getRound()
+                + ". Signal: "
+                + signal
+                + ". Enemies: "
+                + this.enemyArmySize);
       }
     }
 
     // light torch
     this.keepTorchLit();
+
+    // count enemies
+    this.countEnemies();
+    this.uc.println("Number of counted enemies: " + this.enemyArmySize);
 
     this.uc.println("Energy used before moving: " + this.uc.getEnergyUsed());
 
@@ -102,7 +131,7 @@ public class Explorer extends MyUnit {
     this.uc.println("Energy used after optimal direction calculation: " + this.uc.getEnergyUsed());
     while (this.uc.canMove() && tries-- > 0) {
       if (this.uc.canMove(this.currentDir)
-              && this.validLocationCheck(this.uc.getLocation().add(this.currentDir))) {
+          && this.validLocationCheck(this.uc.getLocation().add(this.currentDir))) {
         this.uc.move(this.currentDir);
         // record new visited location
         //        this.visited.add(this.uc.getLocation());
@@ -229,9 +258,7 @@ public class Explorer extends MyUnit {
 
   /** @return true if there are dangerous enemies, false otherwise */
   boolean enemyReaction() {
-    UnitInfo thisInfo = this.uc.getInfo();
-    UnitInfo[] enemies =
-            this.uc.senseUnits(thisInfo.getType().getVisionRange(), this.uc.getOpponent());
+    UnitInfo[] enemies = this.uc.senseUnits(this.uc.getOpponent());
     for (UnitInfo info : enemies) {
       // if the enemies are hostile
       if (info.getAttack() > 0) {
@@ -248,10 +275,21 @@ public class Explorer extends MyUnit {
       this.uc.println("running away");
       Direction optimal = enemy.opposite();
       this.currentDir = optimal;
-//      this.visited.clear();
+      //      this.visited.clear();
       this.visitedID++;
     }
     this.betterMove3();
+  }
+
+  void countEnemies() {
+    for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
+      if (!this.seenEnemies.contains(enemyInfo.getID())
+          && (enemyInfo.getType() == UnitType.AXEMAN
+              || enemyInfo.getType() == UnitType.SPEARMAN)) {
+        this.enemyArmySize++;
+        this.seenEnemies.add(enemyInfo.getID());
+      }
+    }
   }
 
   void calculateDangerZone() {
