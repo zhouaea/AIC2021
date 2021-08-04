@@ -2,7 +2,7 @@ package ourplayer;
 
 import aic2021.user.*;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 
 public class Base extends MyUnit {
 
@@ -12,16 +12,19 @@ public class Base extends MyUnit {
     final int MAX_EXPLORERS = 1;
 
     Team team = uc.getTeam();
-    Team enemy_team = uc.getOpponent();
+    Team enemyTeam = uc.getOpponent();
 
     final int WATER_TILE_THRESHOLD = 15;
     boolean waterMode = false;
 
-    int buildingLocationIndex = 0;
+    boolean newEnemiesSeen = false;
+    int enemyArmySize = 0;
+    HashSet<Integer> seenEnemies = new HashSet<>();
 
+    boolean hasAssignedWorkerAsBarrackBuilder = false;
+    int barrackBuilderId = 0;
     boolean hasAssignedWorkerAsBuilder = false;
     int builderId = 0;
-    boolean hasToldBuilderAllLocationsAreSent = false;
 
     Base(UnitController uc){
         super(uc);
@@ -31,9 +34,10 @@ public class Base extends MyUnit {
     void playRound(){
         checkForWater();
         playDefense();
+        countEnemies();
         spawnTroops();
         researchTech(); // TODO change research path based on different states like "normal", "water", etc.
-        sendBuildingLocations();
+        makeBuilders();
 
 
         uc.println("energy used: " + uc.getEnergyUsed());
@@ -52,10 +56,33 @@ public class Base extends MyUnit {
 
     void playDefense() {
         // Sense enemy units in attack radius and shoot them (add prioritization algorithm later).
-        UnitInfo[] shootable_enemies = uc.senseUnits(18, enemy_team);
+        UnitInfo[] shootable_enemies = uc.senseUnits(18, enemyTeam);
         for (UnitInfo enemy : shootable_enemies) {
             if (uc.canAttack()) {
                 uc.attack(enemy.getLocation());
+            }
+        }
+    }
+
+    void countEnemies() {
+        for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
+            if (!this.seenEnemies.contains(enemyInfo.getID()) && (enemyInfo.getType() == UnitType.AXEMAN || enemyInfo.getType() == UnitType.SPEARMAN)) {
+                this.enemyArmySize++;
+                this.seenEnemies.add(enemyInfo.getID());
+                newEnemiesSeen = true;
+            }
+        }
+
+        // Try to send army size smoke signal every round new enemies appear in range.
+        if (newEnemiesSeen) {
+            if (this.uc.canMakeSmokeSignal()) {
+                this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
+                this.uc.println(
+                        "Enemy army size smoke signal fired on round "
+                                + this.uc.getRound()
+                                + ". Enemies: "
+                                + this.enemyArmySize);
+                newEnemiesSeen = false;
             }
         }
     }
@@ -173,11 +200,43 @@ public class Base extends MyUnit {
     }
 
 
-    void sendBuildingLocations() {
+    void makeBuilders() {
+        if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+            if (!hasAssignedWorkerAsBarrackBuilder) {
+                makeBarrackBuilder();
+            }
+        }
+
         if (uc.hasResearched(Technology.JOBS, team)) {
             if (!hasAssignedWorkerAsBuilder) {
                 makeBuilder();
             }
+        }
+    }
+
+    /**
+     * Spawn a worker, get its id, and tell it to enter building mode.
+     */
+    private void makeBarrackBuilder() {
+        // Cannot proceed unless worker is built.
+        if (!spawnRandom(UnitType.WORKER)) {
+            return;
+        }
+
+        UnitInfo[] allyUnits = uc.senseUnits(2, team);
+        for (UnitInfo unit : allyUnits) {
+            if (unit.getType() == UnitType.WORKER) {
+                barrackBuilderId = unit.getID();
+                break;
+            }
+        }
+
+        // Builder is not assigned until smoke signal is sent.
+        if (uc.canMakeSmokeSignal()) {
+            uc.println(barrackBuilderId);
+            uc.makeSmokeSignal(encodeSmokeSignal(barrackBuilderId, ASSIGN_BARRACK_BUILDER, 1));
+            hasAssignedWorkerAsBarrackBuilder = true;
+            uc.println("worker is now a builder");
         }
     }
 
