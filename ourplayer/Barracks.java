@@ -1,7 +1,6 @@
 package ourplayer;
 
-import aic2021.user.UnitController;
-import aic2021.user.UnitType;
+import aic2021.user.*;
 
 public class Barracks extends MyUnit {
 
@@ -18,20 +17,28 @@ public class Barracks extends MyUnit {
     }
 
     void playRound() {
+        decodeMessages();
+        spawnTroops();
+    }
 
-        // read and record smoke signals
-        if (this.uc.canReadSmokeSignals()) {
-            int[] signals = this.uc.readSmokeSignals();
-            for (int signal : signals) {
-                if (signal % 719 == 0) {
-                    this.maxTroops = signal / 719;
+    private void decodeMessages() {
+        int[] smokeSignals = uc.readSmokeSignals();
+        Location currentLocation = uc.getLocation();
+        DecodedMessage message;
+
+        for (int smokeSignal : smokeSignals) {
+            message = decodeSmokeSignal(currentLocation, smokeSignal);
+            if (message != null) {
+                if (message.unitCode == ENEMY_ARMY_COUNT_REPORT) {
+                    this.maxTroops = message.unitId;
                     this.calculateMaxTroops();
+                    this.uc.println("Base received enemy army size signal. Size: " + this.maxTroops);
                 }
             }
-            this.uc.println(
-                    "Base received enemy army size signal. Size: " + this.maxTroops);
         }
+    }
 
+    void spawnTroops() {
         if (this.axemen < this.maxAxemen) {
             if (spawnRandom(UnitType.AXEMAN))
                 this.axemen++;
@@ -41,45 +48,6 @@ public class Barracks extends MyUnit {
             if (spawnRandom(UnitType.SPEARMAN))
                 this.spearmen++;
         }
-
-
-//    if (this.axemen < 10) {
-//      if (this.uc.canSpawn(UnitType.AXEMAN, Direction.NORTH)) {
-//        this.uc.spawn(UnitType.AXEMAN, Direction.NORTH);
-//        this.uc.println("spawned axeman north");
-//        this.axemen++;
-////        return;
-//      } else {
-//        this.uc.println("can't spawn axeman north");
-//      }
-//      if (this.uc.canSpawn(UnitType.AXEMAN, Direction.SOUTH)) {
-//        this.uc.spawn(UnitType.AXEMAN, Direction.SOUTH);
-//        this.uc.println("spawned axeman south");
-//        this.axemen++;
-////        return;
-//      } else {
-//        this.uc.println("can't spawn axeman south");
-//      }
-//    }
-//
-//    if (this.spearmen < 10) {
-//      if (this.uc.canSpawn(UnitType.SPEARMAN, Direction.NORTH)) {
-//        this.uc.spawn(UnitType.SPEARMAN, Direction.NORTH);
-//        this.uc.println("spawned spearman north");
-//        this.spearmen++;
-////        return;
-//      } else {
-//        this.uc.println("can't spawn spearman north");
-//      }
-//      if (this.uc.canSpawn(UnitType.SPEARMAN, Direction.SOUTH)) {
-//        this.uc.spawn(UnitType.SPEARMAN, Direction.SOUTH);
-//        this.uc.println("spawned spearman south");
-//        this.spearmen++;
-////        return;
-//      } else {
-//        this.uc.println("can't spawn spearman south");
-//      }
-//    }
     }
 
     void calculateMaxTroops() {
