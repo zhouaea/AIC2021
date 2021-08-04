@@ -435,19 +435,22 @@ public abstract class MyUnit {
         if (uc.hasTrap(loc))
             return false;
 
-        UnitInfo[] enemyUnits = uc.senseUnits(uc.getTeam().getOpponent());
-        for (UnitInfo unit : enemyUnits) {
-            int attackRange = unit.getType().getAttackRange();
-
-            if (loc.distanceSquared(unit.getLocation()) <= attackRange)
-                return false;
-        }
-
         if (enemyBaseLocation == null)
             setBaseLocation();
 
-        if (loc.distanceSquared(enemyBaseLocation) <= UnitType.BASE.getAttackRange())
-            return false;
+        if (enemyBaseLocation != null)
+            if (loc.distanceSquared(enemyBaseLocation) <= UnitType.BASE.getAttackRange())
+                return false;
+
+        if (uc.getType() == UnitType.WORKER || uc.getType() == UnitType.EXPLORER) {
+            UnitInfo[] enemyUnits = uc.senseUnits(uc.getTeam().getOpponent());
+            for (UnitInfo unit : enemyUnits) {
+                int attackRange = unit.getType().getAttackRange();
+
+                if (loc.distanceSquared(unit.getLocation()) <= attackRange)
+                    return false;
+            }
+        }
 
         return true;
     }
