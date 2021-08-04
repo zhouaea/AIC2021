@@ -58,7 +58,7 @@ public class Explorer extends MyUnit {
     }
 
     // try to send resource location smoke signal (at most every 30 rounds)
-    if (this.uc.getRound() % 30 == 0) {
+    if (this.uc.getRound() % 30 == 0 && this.uc.getRound() > 100) {
       if (this.newResources.size() > 0) {
         if (this.uc.canMakeSmokeSignal()) {
           int signal = this.encodeResourceMessage(this.newResources.remove(0));
@@ -119,7 +119,9 @@ public class Explorer extends MyUnit {
     this.uc.println("Energy used after finding base: " + this.uc.getEnergyUsed());
 
     // look for resources
-    this.findResources();
+    if (this.uc.getRound() > 100) {
+      this.findResources();
+    }
 
     this.uc.println("Energy used after finding resources: " + this.uc.getEnergyUsed());
   }
@@ -284,8 +286,7 @@ public class Explorer extends MyUnit {
   void countEnemies() {
     for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
       if (!this.seenEnemies.contains(enemyInfo.getID())
-          && (enemyInfo.getType() == UnitType.AXEMAN
-              || enemyInfo.getType() == UnitType.SPEARMAN)) {
+          && (enemyInfo.getType() == UnitType.AXEMAN || enemyInfo.getType() == UnitType.SPEARMAN)) {
         this.enemyArmySize++;
         this.seenEnemies.add(enemyInfo.getID());
       }
