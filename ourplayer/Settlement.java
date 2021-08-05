@@ -5,6 +5,7 @@ import aic2021.user.*;
 public class Settlement extends MyUnit {
 
     Team team = uc.getTeam();
+    Location location = uc.getLocation();
 
     final int ResourcesPerWorkerSpawnThreshold = 400;
 
@@ -31,9 +32,11 @@ public class Settlement extends MyUnit {
 
         ResourceInfo[] resources = uc.senseResources();
         double totalResourceAmount = 0;
-        // TODO make sure resource is not under
+
         for (ResourceInfo resource: resources) {
-            totalResourceAmount += resource.amount;
+            // Don't count a resource under a settlement.
+            if (location != resource.location)
+                totalResourceAmount += resource.amount;
         }
 
         if (workersInArea == 0) {
