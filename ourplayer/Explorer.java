@@ -16,8 +16,10 @@ public class Explorer extends MyUnit {
   boolean initDirSet = false;
   boolean sentSignal = false;
   boolean baseFound = false;
+  boolean sentWaterSignal = false;
 
-  int visitedID = 71920;
+  final int visitedID = 71920;
+  final int waterTileThreshold = 15;
 
   Direction currentDir;
 
@@ -25,13 +27,13 @@ public class Explorer extends MyUnit {
 
   ArrayList<ResourceInfo> newResources = new ArrayList<>();
 
-  ArrayList<Location> seenResources = new ArrayList<>();
+  HashSet<Location> seenResources = new HashSet<>();
 
   ArrayList<Location> dangerZone = new ArrayList<>();
 
-  int enemyArmySize = 0;
-
   HashSet<Integer> seenEnemies = new HashSet<>();
+
+  HashSet<Location> seenWater = new HashSet<>();
 
   Team team = this.uc.getTeam();
   Team enemyTeam = this.uc.getOpponent();
@@ -69,18 +71,27 @@ public class Explorer extends MyUnit {
       }
     }
 
-    // try to send resource location smoke signal (at most every 49 rounds)
+    // Try to send army size smoke signal (at most every 49 rounds).
     if (this.uc.getRound() % 49 == 0) {
       if (this.uc.canMakeSmokeSignal()) {
-        int signal = this.enemyArmySize * 719;
-        this.uc.makeSmokeSignal(signal);
+        int enemyArmySize = this.seenEnemies.size();
+        this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
         this.uc.println(
             "Enemy army size smoke signal fired on round "
                 + this.uc.getRound()
-                + ". Signal: "
-                + signal
                 + ". Enemies: "
-                + this.enemyArmySize);
+                + enemyArmySize);
+      }
+    }
+
+    // try to send water smoke signal
+    if (!this.sentWaterSignal) {
+      if (this.seenWater.size() >= this.waterTileThreshold) {
+        int signal = 122500;
+        this.uc.makeSmokeSignal(signal);
+        this.sentWaterSignal = true;
+        this.uc.println(
+            "Water smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
       }
     }
 
@@ -89,7 +100,11 @@ public class Explorer extends MyUnit {
 
     // count enemies
     this.countEnemies();
-    this.uc.println("Number of counted enemies: " + this.enemyArmySize);
+    this.uc.println("Number of counted enemies: " + this.seenEnemies.size());
+
+    // count water
+    this.countWater();
+    this.uc.println("Number of counted water tiles: " + this.seenWater.size());
 
     this.uc.println("Energy used before moving: " + this.uc.getEnergyUsed());
 
@@ -99,13 +114,6 @@ public class Explorer extends MyUnit {
     }
 
     this.uc.println("Energy used after moving: " + this.uc.getEnergyUsed());
-
-    //     clean up visited memory
-    //    if (this.visited.size() > 30) {
-    //      this.visited.remove(0);
-    //    }
-
-    this.uc.println("Energy used after clearing memory: " + this.uc.getEnergyUsed());
 
     // did it find the base?
     if (!this.baseFound) {
@@ -214,20 +222,6 @@ public class Explorer extends MyUnit {
     return true;
   }
 
-  //  boolean validLocationCheck(Location l) {
-  //    for (Location location : this.visited) {
-  //      if (l.isEqual(location)) {
-  //        return false;
-  //      }
-  //    }
-  //    for (Location loc : this.dangerZone) {
-  //      if (l.isEqual(loc)) {
-  //        return false;
-  //      }
-  //    }
-  //    return true;
-  //  }
-
   boolean findBase() {
     for (UnitInfo info : this.uc.senseUnits(this.uc.getOpponent())) {
       if (info.getType() == UnitType.BASE) {
@@ -260,16 +254,20 @@ public class Explorer extends MyUnit {
 
   /** @return true if there are dangerous enemies, false otherwise */
   boolean enemyReaction() {
+    boolean react = false;
     UnitInfo[] enemies = this.uc.senseUnits(this.uc.getOpponent());
     for (UnitInfo info : enemies) {
-      // if the enemies are hostile
-      if (info.getAttack() > 0) {
+      // if the enemies are hostile and explorer is in range
+      int attackRange = info.getType().attackRange;
+      if (info.getAttack() > 0
+          && (info.getLocation().distanceSquared(this.uc.getLocation()) <= attackRange + 1)) {
         //        this.sentryMode = false;
         this.runAway(this.uc.getLocation().directionTo(info.getLocation()));
+        react = true;
         break;
       }
     }
-    return enemies.length != 0;
+    return react;
   }
 
   void runAway(Direction enemy) {
@@ -277,8 +275,7 @@ public class Explorer extends MyUnit {
       this.uc.println("running away");
       Direction optimal = enemy.opposite();
       this.currentDir = optimal;
-      //      this.visited.clear();
-      this.visitedID++;
+      //      this.visitedID++;
     }
     this.betterMove3();
   }
@@ -286,11 +283,29 @@ public class Explorer extends MyUnit {
   void countEnemies() {
     for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
       if (!this.seenEnemies.contains(enemyInfo.getID())
-          && (enemyInfo.getType() == UnitType.AXEMAN || enemyInfo.getType() == UnitType.SPEARMAN)) {
-        this.enemyArmySize++;
+          && (enemyInfo.getType() == UnitType.AXEMAN
+              || enemyInfo.getType() == UnitType.SPEARMAN
+              || enemyInfo.getType() == UnitType.WORKER)) {
         this.seenEnemies.add(enemyInfo.getID());
       }
     }
+  }
+
+  void countWater() {
+    for (Location water : this.uc.senseWater(this.uc.getType().getVisionRange())) {
+      if (!this.alreadySeenWaterCheck(water)) {
+        this.seenWater.add(water);
+      }
+    }
+  }
+
+  boolean alreadySeenWaterCheck(Location l) {
+    for (Location loc : this.seenWater) {
+      if (l.isEqual(loc)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   void calculateDangerZone() {

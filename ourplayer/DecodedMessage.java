@@ -6,9 +6,16 @@ public class DecodedMessage {
   Location location;
   int unitCode;
   int unitAmount;
+  int unitId;
 
   DecodedMessage(Location location, int unitCode, int unitAmount) {
     this.location = location;
+    this.unitCode = unitCode;
+    this.unitAmount = unitAmount;
+  }
+
+  DecodedMessage(int unitId, int unitCode, int unitAmount) {
+    this.unitId = unitId;
     this.unitCode = unitCode;
     this.unitAmount = unitAmount;
   }

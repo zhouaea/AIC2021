@@ -1,6 +1,7 @@
 package ourplayer;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import aic2021.user.Location;
 import aic2021.user.ResourceInfo;
@@ -11,57 +12,84 @@ import aic2021.user.UnitInfo;
 import aic2021.user.UnitType;
 
 public class Base extends MyUnit {
+
   int workers = 0;
   int explorers = 0;
   final int MAX_WORKERS = 5;
   final int MAX_EXPLORERS = 1;
-  ArrayList<Integer> messages = new ArrayList<>();
-
 
   Team team = uc.getTeam();
-  Team enemy_team = uc.getOpponent();
+  Team enemyTeam = uc.getOpponent();
 
-  final int MAX_BUILDINGS_PLACED = 20;
-  boolean hasCalculatedBuildingLocations = false;
-  ArrayList<Location> buildingLocations = new ArrayList<>();
-  int buildingLocationsAdded = 0;
-  int buildingLocationIndex = 0;
+  final int WATER_TILE_THRESHOLD = 15;
+  boolean waterMode = false;
+
+  boolean newEnemiesSeen = false;
+  int enemyArmySize = 0;
+  HashSet<Integer> seenEnemies = new HashSet<>();
+
+  boolean hasAssignedWorkerAsBarrackBuilder = false;
+  int barrackBuilderId = 0;
+  boolean hasAssignedWorkerAsBuilder = false;
+  int builderId = 0;
 
   Base(UnitController uc){
     super(uc);
   }
 
+  // TODO If base sees traps, spawn trapper
   void playRound(){
-    spawnTroops();
+    checkForWater();
     playDefense();
-    senseEnemies();
-    senseResources();
+    countEnemies();
+    spawnTroops();
     researchTech(); // TODO change research path based on different states like "normal", "water", etc.
-    sendBuildingLocations();
+    makeBuilders();
 
 
     uc.println("energy used: " + uc.getEnergyUsed());
     uc.println("energy left: " + uc.getEnergyLeft());
+  }
 
-      // read and record smoke signals
-      if (this.uc.canReadSmokeSignals()) {
-        int[] signals = this.uc.readSmokeSignals();
-        for (int signal : signals) {
-          this.messages.add(signal);
-        }
-        if (signals.length > 0) {
-          this.uc.println(
-                  "Base received " + signals.length + " signals: First signal is: " + signals[0]);
-        }
+  void checkForWater() {
+    if (uc.getRound() == 0) {
+      Location[] waterTiles = uc.senseWater(50);
+      if (waterTiles.length >= WATER_TILE_THRESHOLD) {
+        waterMode = true;
+        uc.println("water mode activated");
       }
+    }
   }
 
   void playDefense() {
     // Sense enemy units in attack radius and shoot them (add prioritization algorithm later).
-    UnitInfo[] shootable_enemies = uc.senseUnits(18, enemy_team);
+    UnitInfo[] shootable_enemies = uc.senseUnits(18, enemyTeam);
     for (UnitInfo enemy : shootable_enemies) {
       if (uc.canAttack()) {
         uc.attack(enemy.getLocation());
+      }
+    }
+  }
+
+  void countEnemies() {
+    for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
+      if (!this.seenEnemies.contains(enemyInfo.getID()) && (enemyInfo.getType() == UnitType.AXEMAN || enemyInfo.getType() == UnitType.SPEARMAN)) {
+        this.enemyArmySize++;
+        this.seenEnemies.add(enemyInfo.getID());
+        newEnemiesSeen = true;
+      }
+    }
+
+    // Try to send army size smoke signal every round new enemies appear in range.
+    if (newEnemiesSeen) {
+      if (this.uc.canMakeSmokeSignal()) {
+        this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
+        this.uc.println(
+                "Enemy army size smoke signal fired on round "
+                        + this.uc.getRound()
+                        + ". Enemies: "
+                        + this.enemyArmySize);
+        newEnemiesSeen = false;
       }
     }
   }
@@ -99,17 +127,31 @@ public class Base extends MyUnit {
   }
 
   private void researchTechLevel0() {
-    if (uc.canResearchTechnology(Technology.UTENSILS)) {
-      uc.researchTechnology(Technology.UTENSILS);
-      return;
-    }
-    if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.UTENSILS, team)) {
-      uc.researchTechnology(Technology.MILITARY_TRAINING);
-      return;
-    }
-    if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.UTENSILS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
-      uc.researchTechnology(Technology.BOXES);
-      return;
+    if (waterMode) {
+      if (uc.canResearchTechnology(Technology.RAFTS)) {
+        uc.researchTechnology(Technology.RAFTS);
+        return;
+      }
+
+      if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.RAFTS, team)) {
+        uc.researchTechnology(Technology.MILITARY_TRAINING);
+        return;
+      }
+      if (uc.canResearchTechnology(Technology.UTENSILS) && uc.hasResearched(Technology.RAFTS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+        uc.researchTechnology(Technology.UTENSILS);
+      }
+    } else {
+      if (uc.canResearchTechnology(Technology.UTENSILS)) {
+        uc.researchTechnology(Technology.UTENSILS);
+        return;
+      }
+      if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.UTENSILS, team)) {
+        uc.researchTechnology(Technology.MILITARY_TRAINING);
+        return;
+      }
+      if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.UTENSILS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+        uc.researchTechnology(Technology.BOXES);
+      }
     }
   }
 
@@ -126,14 +168,22 @@ public class Base extends MyUnit {
 
     if (uc.canResearchTechnology(Technology.COOKING) && uc.hasResearched(Technology.TACTICS, team) && uc.hasResearched(Technology.JOBS, team)) {
       uc.researchTechnology(Technology.COOKING);
-      return;
     }
   }
 
   private void researchTechLevel2() {
-    if (uc.canResearchTechnology(Technology.SCHOOLS)) {
-      uc.researchTechnology(Technology.SCHOOLS);
+    if (uc.canResearchTechnology(Technology.CRYSTALS)) {
+      uc.researchTechnology(Technology.CRYSTALS);
       return;
+    }
+
+    if (uc.canResearchTechnology(Technology.COMBUSTION)) {
+      uc.researchTechnology(Technology.COMBUSTION);
+      return;
+    }
+
+    if (uc.canResearchTechnology(Technology.POISON)) {
+      uc.researchTechnology(Technology.POISON);
     }
   }
 
@@ -157,43 +207,69 @@ public class Base extends MyUnit {
   }
 
 
-  void sendBuildingLocations() {
-    if (!hasCalculatedBuildingLocations) {
-      calculateBuildingLocations();
+  void makeBuilders() {
+    if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+      if (!hasAssignedWorkerAsBarrackBuilder) {
+        makeBarrackBuilder();
+      }
     }
 
-    // Send a building location to all workers when possible.
-    if (uc.canMakeSmokeSignal() && buildingLocationIndex < buildingLocations.size()) {
-      uc.makeSmokeSignal(encodeBuildingLocation(buildingLocations.get(buildingLocationIndex)));
-      buildingLocationIndex++;
-      uc.println("Building Location Sent");
+    if (uc.hasResearched(Technology.JOBS, team)) {
+      if (!hasAssignedWorkerAsBuilder) {
+        makeBuilder();
+      }
     }
   }
 
-  private void calculateBuildingLocations() {
-    Location baseLocation = uc.getLocation();
-    int base_x_parity = baseLocation.x % 2;
-    int base_y_parity = baseLocation.y % 2;
+  /**
+   * Spawn a worker, get its id, and tell it to enter building mode.
+   */
+  private void makeBarrackBuilder() {
+    // Cannot proceed unless worker is built.
+    if (!spawnRandom(UnitType.WORKER)) {
+      return;
+    }
 
-    Location[] visibleLocations = uc.getVisibleLocations();
-    for (Location location : visibleLocations) {
-      // Limit the number of buildings that will be placed.
-      if (buildingLocationsAdded > MAX_BUILDINGS_PLACED) {
+    UnitInfo[] allyUnits = uc.senseUnits(2, team);
+    for (UnitInfo unit : allyUnits) {
+      if (unit.getType() == UnitType.WORKER) {
+        barrackBuilderId = unit.getID();
         break;
       }
+    }
 
-      // Building location is not the base location
-      if (!location.isEqual(baseLocation)) {
-        // Building locations must be part of the lattice structure.
-        if ((location.x % 2 == base_x_parity && location.y % 2 == base_y_parity) || location.x % 2 != base_x_parity && location.y % 2 != base_y_parity) {
-          // Only select locations where buildings can be placed.
-          if (!uc.hasMountain(location) && !uc.hasWater(location) && !uc.isOutOfMap(location)) {
-            buildingLocations.add(location);
-            buildingLocationsAdded++;
-          }
-        }
+    // Builder is not assigned until smoke signal is sent.
+    if (uc.canMakeSmokeSignal()) {
+      uc.println(barrackBuilderId);
+      uc.makeSmokeSignal(encodeSmokeSignal(barrackBuilderId, ASSIGN_BARRACK_BUILDER, 1));
+      hasAssignedWorkerAsBarrackBuilder = true;
+      uc.println("worker is now a builder");
+    }
+  }
+
+  /**
+   * Spawn a worker, get its id, and tell it to enter building mode.
+   */
+  private void makeBuilder() {
+    // Cannot proceed unless worker is built.
+    if (!spawnRandom(UnitType.WORKER)) {
+      return;
+    }
+
+    UnitInfo[] allyUnits = uc.senseUnits(2, team);
+    for (UnitInfo unit : allyUnits) {
+      if (unit.getType() == UnitType.WORKER) {
+        builderId = unit.getID();
+        break;
       }
     }
-    hasCalculatedBuildingLocations = true;
+
+    // Builder is not assigned until smoke signal is sent.
+    if (uc.canMakeSmokeSignal()) {
+      uc.println(builderId);
+      uc.makeSmokeSignal(encodeSmokeSignal(builderId, ASSIGN_BUILDER, 1));
+      hasAssignedWorkerAsBuilder = true;
+      uc.println("worker is now a builder");
+    }
   }
 }

@@ -108,9 +108,9 @@ public class Spearman extends MyUnit {
     }
 
     void calculateZone() {
-        this.zoneMaxX = this.baseLocation.x + 8;
-        this.zoneMinX = this.baseLocation.x - 8;
-        this.zoneMaxY = this.baseLocation.y + 8;
-        this.zoneMinY = this.baseLocation.y - 8;
+        this.zoneMaxX = this.baseLocation.x + 6;
+        this.zoneMinX = this.baseLocation.x - 6;
+        this.zoneMaxY = this.baseLocation.y + 6;
+        this.zoneMinY = this.baseLocation.y - 6;
     }
 }
