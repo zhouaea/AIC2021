@@ -36,6 +36,7 @@ public class Base extends MyUnit {
         playDefense();
         countEnemies();
         spawnTroops();
+        decodeMessages();
         researchTech(); // TODO change research path based on different states like "normal", "water", etc.
         makeBuilders();
 
@@ -192,12 +193,22 @@ public class Base extends MyUnit {
         }
     }
 
-    // TODO send smoke signals to workers about resources in range
-    void senseTerrain() {
-        // Sense terrain in range, and maybe let troops know about important spots.
-        Location[] water_tiles = uc.senseWater(50);
-        Location[] mountain_tiles = uc.senseMountains(50);
+    void decodeMessages() {
+        int[] smokeSignals = uc.readSmokeSignals();
+        Location currentLocation = uc.getLocation();
+        DecodedMessage message;
+
+        for (int smokeSignal : smokeSignals) {
+            message = decodeSmokeSignal(currentLocation, smokeSignal);
+            if (message != null) {
+                if (message.unitCode == BUY_RAFTS) {
+                    waterMode = true;
+                    uc.println("water mode activated");
+                }
+            }
+        }
     }
+
 
 
     void makeBuilders() {
