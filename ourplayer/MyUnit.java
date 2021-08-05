@@ -123,8 +123,6 @@ public abstract class MyUnit {
         int extra_info = teamIdentifier * 256 + unitAmount * 16 + unitCode;
         // Shift extra info (teamIdentifier + unitAmount + unitCode) 14 spaces.
         int message = extra_info * 128 * 128 + encodeLocation(location);
-        uc.println("unitCode to send: " + unitCode);
-        uc.println("unitAmount to send: " + unitAmount);
         uc.println("location to encode: " + location);
 
         return message;
@@ -178,13 +176,12 @@ public abstract class MyUnit {
         // identifier is bits 21-31
         codedMessage = codedMessage / 16;
         int identifier = codedMessage;
-        uc.println("identifier: " + identifier);
 
         // Only decode message if we are 99% certain that the message is ours.
         DecodedMessage decodedMessage;
         if (identifier == teamIdentifier) {
             // If this message is for assigning a builder, the location field is now used to mention a unit id.
-            if (unitCode == ASSIGN_BUILDER || unitCode == ASSIGN_BARRACK_BUILDER) {
+            if (unitCode == ASSIGN_BUILDER || unitCode == ASSIGN_BARRACK_BUILDER || unitCode == ENEMY_ARMY_COUNT_REPORT) {
                 int unitId = originalCodedMessage % (128 * 128);
                 decodedMessage = new DecodedMessage(unitId, unitCode, unitAmount);
             } else {
@@ -193,9 +190,7 @@ public abstract class MyUnit {
                 if (unitCode == WOOD || unitCode == FOOD || unitCode == STONE) {
                     unitAmount *= 100;
                 }
-                uc.println("unitCode decoded: " + unitCode);
-                uc.println("unitAmount decoded: " + unitAmount);
-                uc.println("location decoded: " + location);
+                uc.println("decoded location: " + location);
                 decodedMessage = new DecodedMessage(location, unitCode, unitAmount);
             }
         } else {
@@ -208,8 +203,6 @@ public abstract class MyUnit {
     Location decodeLocation(Location current_location, int code) {
         int encodedY = 127 & code; // encoded y coordinate is first 7 bits
         int encodedX = 127 & (code / 128);  // encoded x coordinate is bits 8-15
-        uc.println("encodedX: " + encodedX);
-        uc.println("encodedY: " + encodedY);
 
         // Get close to the offset by getting rid of the remainder bits of the decoder's current location.
         int offsetX = (current_location.x / 128) * 128;
@@ -217,56 +210,47 @@ public abstract class MyUnit {
 
         Location possibleLocation = new Location(offsetX + encodedX, offsetY + encodedY);
         Location bestLocationSoFar = possibleLocation;
-        uc.println(bestLocationSoFar);
 
         // Offset may be off by 128 squares in either the x or y axes.
         Location alternateLocation = possibleLocation.add(128, 128);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(0, -128);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(0, -128);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(-128, 0);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(-128, 0);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(0, 128);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(0, 128);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         alternateLocation = alternateLocation.add(128, 0);
         if (current_location.distanceSquared(alternateLocation) < current_location.distanceSquared(bestLocationSoFar)) {
             bestLocationSoFar = alternateLocation;
         }
-        uc.println(alternateLocation);
 
         return bestLocationSoFar;
     }

@@ -10,6 +10,7 @@ public class Worker extends MyUnit {
     }
 
     Team team = uc.getTeam();
+    Team enemy = uc.getOpponent();
     Team deerTeam = Team.NEUTRAL;
 
     ArrayList<ResourceInfo> found_resources = new ArrayList<>(); //ArrayList instead of queue in case we want to prioritize certain resources
@@ -25,6 +26,9 @@ public class Worker extends MyUnit {
     ArrayList<Location> buildingLocations = new ArrayList<>();
     int buildingLocationsAdded = 0;
 
+    boolean isFightingEnemyWorkers = false;
+    Location currentEnemyWorkerLocation;
+
     boolean isHunting = false;
     Location currentDeerLocation;
 
@@ -39,39 +43,35 @@ public class Worker extends MyUnit {
 
     Direction currentDir = Direction.NORTH;
 
-    int farms = 0;
-    int sawmills = 0;
-    int quarries = 0;
-
     void playRound(){
-        if (uc.getInfo().getID() == 4264 && uc.getRound() == 223) {
+        if (uc.getInfo().getID() == 2832 && uc.getRound() == 665) {
             uc.println("hello");
         }
-
         // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
         // TODO use DFS for builder pathfinding instead of bug2, since bug2 will go around entire map to reach location sometimes
-        // TODO Have worker build a barrack for its first building
         // TODO come up with faster way for builder to place buildings along lattice structure
+        // TODO Don't add resources in the range of the enemy base.
         // If just created, store team's base location.
         if (!knowsPlaceToDeposit) {
             rememberDepositLocation();
         }
 
         senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first priority.
-        uc.println(uc.getEnergyLeft());
         decodeMessages(); // get locations of resources from other units or a place to build a building from the base
-        uc.println(uc.getEnergyLeft());
         senseResources(); // add/remove resource locations to/from memory
+        senseEnemyWorkers();
         senseDeer(); //  check local area for deer to hunt
-        uc.println(uc.getEnergyLeft());
         keepTorchLit();
-        uc.println(uc.getEnergyLeft());
 
         if (isBarrackBuilding) {
             spawnBarrack();
         } else if (isBuilding) {
             spawnBuildings(); // once jobs is unlocked, spawn 20 buildings max
             uc.println("building");
+        }
+        else if (isFightingEnemyWorkers) {
+            fightEnemyWorkers();
+            uc.println("fighting enemy workers");
         }
         // Hunting takes precedence over depositing (can kill deer on the way).
         else if (isHunting) {
@@ -87,8 +87,6 @@ public class Worker extends MyUnit {
             moveToResource(); // movement options
             uc.println("movetoresource");
         }
-
-        uc.println(uc.getEnergyLeft());
 
         uc.println(uc.getEnergyLeft());
     }
@@ -112,7 +110,7 @@ public class Worker extends MyUnit {
      * If a smoke signal is from an ally and is for a resource location, add the encoded resource to broadcasted_resources.
      * Alternatively, if the signal is for a building location, add the encoded location to buildingLocations.
      */
-    private void decodeMessages() {
+     void decodeMessages() {
         int[] smokeSignals = uc.readSmokeSignals();
         Location currentLocation = uc.getLocation();
         DecodedMessage message;
@@ -154,9 +152,10 @@ public class Worker extends MyUnit {
         ResourceInfo[] resources = uc.senseResources();
         for (ResourceInfo resource : resources) {
             resourceInArea += resource.amount;
-            if (found_resources.size() <= MAX_RESOURCES_TO_REMEMBER) {
+            if (found_resources.size() < MAX_RESOURCES_TO_REMEMBER) {
                 if (!alreadyRecordedResource(resource)) {
-                    if (!locationHasAnotherWorker(resource.location)) {
+                    // Only add the resource if there isn't a worker on it already, and it is safe to move to.
+                    if (!locationHasAnotherWorker(resource.location) && isSafeToMove(resource.location)) {
                         found_resources.add(resource);
                     }
 
@@ -169,7 +168,7 @@ public class Worker extends MyUnit {
 
         // If the total amount of resources in sight exceeds a threshold, build a settlement, if a deposit isn't nearby.
         if (resourceInArea >= RESOURCE_THRESHOLD_FOR_SETTLEMENT && !checkForDeposit()) {
-            spawnRandomSettlement();
+            spawnSettlement();
         }
 
         // If the worker is set on a resource target
@@ -179,9 +178,9 @@ public class Worker extends MyUnit {
             uc.println("size of found resources: " + found_resources.size());
 
             Location currentResourceLocation = found_resources.get(currentFoundResourceIndex).location;
-            // If the target resource location can be sensed and has no resources or another worker is currently
-            // on the resource, a new target needs to be found.
-            if (locationHasNoResources(currentResourceLocation) || locationHasAnotherWorker(currentResourceLocation)) {
+            // If the target resource location can be sensed and has no resources,another worker is currently
+            // on the resource, or it is unsafe to move to, a new target needs to be found.
+            if (locationHasNoResources(currentResourceLocation) || locationHasAnotherWorker(currentResourceLocation) || !isSafeToMove(currentResourceLocation)) {
                 found_resources.remove(currentFoundResourceIndex);
                 currentFoundResourceIndex = -1;
                 closestLocation = null; // Reset pathfinding manually after worker changes target.
@@ -212,13 +211,15 @@ public class Worker extends MyUnit {
     /**
      * Randomly place settlement, prioritizing a location with no resources on it.
      */
-    private void spawnRandomSettlement() {
+    private void spawnSettlement() {
         Location currentLocation = uc.getLocation();
+        Location potentialLocation;
 
         for (Direction dir : dirs){
             // Try to place settlement on a location with no resources.
-            if (max(uc.senseResourceInfo(currentLocation.add(dir))) == 0) {
-                if (uc.canSpawn(UnitType.SETTLEMENT, dir)){
+            potentialLocation = currentLocation.add((dir));
+            if (!uc.isOutOfMap(potentialLocation) && max(uc.senseResourceInfo(potentialLocation)) == 0) {
+                if (uc.canSpawn(UnitType.SETTLEMENT, dir)) {
                     uc.spawn(UnitType.SETTLEMENT, dir);
                     return;
                 }
@@ -227,7 +228,7 @@ public class Worker extends MyUnit {
 
         // If there are no adjacent locations without resources, place the settlement anywhere.
         for (Direction dir : dirs){
-            if (uc.canSpawn(UnitType.SETTLEMENT, dir)){
+            if (!uc.isOutOfMap(currentLocation.add(dir)) && uc.canSpawn(UnitType.SETTLEMENT, dir)){
                 uc.spawn(UnitType.SETTLEMENT, dir);
             }
         }
@@ -280,6 +281,26 @@ public class Worker extends MyUnit {
         }
 
         return false;
+    }
+
+    /**
+     * If deer is/are found, engage in hunting mode on the closest one in sight.
+     */
+    void senseEnemyWorkers() {
+        UnitInfo[] enemyUnits = uc.senseUnits(enemy);
+
+        for (UnitInfo enemyUnit : enemyUnits) {
+            if (enemyUnit.getType() == UnitType.WORKER) {
+                currentEnemyWorkerLocation = enemyUnit.getLocation();
+                isFightingEnemyWorkers = true;
+                return;
+            }
+        }
+
+        if (isFightingEnemyWorkers) {
+            isFightingEnemyWorkers = false; // Enemy worker was killed
+            closestLocation = null; // Reset pathfinding manually after worker is done chasing deer
+        }
     }
 
     /**
@@ -398,6 +419,18 @@ public class Worker extends MyUnit {
         uc.println("building locations: " + buildingLocations);
     }
 
+    void fightEnemyWorkers() {
+        if (uc.canAttack(currentEnemyWorkerLocation)) {
+            uc.attack(currentEnemyWorkerLocation);
+        }
+
+        bug2(uc.getLocation(), currentEnemyWorkerLocation, true);
+
+        if (uc.canAttack(currentEnemyWorkerLocation)) {
+            uc.attack(currentEnemyWorkerLocation);
+        }
+    }
+
     /**
      * Attempt to attack and move to deer in vision radius.
      */
@@ -418,12 +451,17 @@ public class Worker extends MyUnit {
      * Additionally, spawn a barrack next to the deposit location if it doesn't exist already.
      */
     void deposit() {
-        // Unit can only deposit once unit has reached its deposit location.
-        if (bug2(uc.getLocation(), depositLocation, true)) {
-            if (uc.canDeposit()) {
-                uc.deposit();
-                isDepositing = false;
+        if (depositLocation != null) {
+            // Unit can only deposit once unit has reached its deposit location.
+            if (bug2(uc.getLocation(), depositLocation, true)) {
+                if (uc.canDeposit()) {
+                    uc.deposit();
+                    isDepositing = false;
+                }
             }
+        // If the unit's target deposit is destroyed and no longer exists, hope it finds another one close by.
+        } else {
+            isDepositing = false;
         }
     }
 
@@ -436,7 +474,7 @@ public class Worker extends MyUnit {
 
         uc.println("can gather resources is -->");
         uc.println(uc.canGatherResources());
-        // Gather resources as long as worker has not filled up on resource and there are still resources left.
+        // Gather resources as long as worker has not filled up on a resource and there are still resources left.
         if (uc.canGatherResources() && max(uc.senseResourceInfo(uc.getLocation())) > 0 && ((maxResourcesCarried < 100 && !uc.hasResearched(Technology.BOXES, team)) || ((maxResourcesCarried < 200 && uc.hasResearched(Technology.BOXES, team))))) {
             int maxResourceAmountAtLocation = max((uc.senseResourceInfo(uc.getLocation())));
 
@@ -454,9 +492,9 @@ public class Worker extends MyUnit {
             uc.gatherResources();
             uc.println("gathering resources");
         // If there are no resources left, but the unit hasn't filled up on resources, find other resources.
-        } else if (max(uc.senseResourceInfo(uc.getLocation())) == 0) {
+        } else if ((maxResourcesCarried < 100 && !uc.hasResearched(Technology.BOXES, team)) || ((maxResourcesCarried < 200 && uc.hasResearched(Technology.BOXES, team)))) {
             isMining = false;
-        // If the unit can't get resources, deposit resources at base.
+        // If the unit can't get resources because it's at carrying capacity, deposit resources at base.
         } else {
             isMining = false;
             isDepositing = true;
@@ -465,7 +503,8 @@ public class Worker extends MyUnit {
     }
 
     /**
-     * Helper function for mine().
+     * Helper function for mine()
+     * Helper function for spawnRandomSettlement()
      * Exists since multiple resources can be stacked on top of eachother (e.g. deer dies on a forest).
      * @param array of resources on a tile
      * @return the amount of the most plentiful reosurce on the tile

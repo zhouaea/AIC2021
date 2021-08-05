@@ -17,10 +17,6 @@ public class Settlement extends MyUnit {
     }
 
     void playRound() {
-        if (uc.getInfo().getID() == 2577 && uc.getRound() == 96) {
-            uc.println("hello");
-        }
-
         spawnWorkers();
         decodeMessages();
         sendEnemyBaseLocation();
