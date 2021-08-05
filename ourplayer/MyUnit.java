@@ -12,7 +12,7 @@ public abstract class MyUnit {
     final int FOOD = 3;
     final int ASSIGN_BARRACK_BUILDER = 4;
     final int ENEMY_ARMY_COUNT_REPORT = 5;
-    final int ENEMY_EXPLORER = 6;
+    final int BUY_RAFTS = 6;
     final int ENEMY_TRAPPER = 7;
     final int ENEMY_AXEMAN = 8;
     final int ENEMY_SPEARMAN=  9;
