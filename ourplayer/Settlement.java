@@ -64,8 +64,10 @@ public class Settlement extends MyUnit {
 
         for (int smokeSignal : smokeSignals) {
             message = decodeSmokeSignal(currentLocation, smokeSignal);
-            if (message.unitCode == ENEMY_BASE)
-                enemyBaseLocation = message.location;
+            if (message != null) {
+                if (message.unitCode == ENEMY_BASE)
+                    enemyBaseLocation = message.location;
+            }
         }
     }
 
