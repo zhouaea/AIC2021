@@ -5,12 +5,10 @@ import aic2021.user.*;
 public class Barracks extends MyUnit {
 
     int axemen = 0;
-    int spearmen = 0;
 
     int maxTroops = -1;
 
     int maxAxemen = 2;
-    int maxSpearmen = 2;
 
     Barracks(UnitController uc) {
         super(uc);
@@ -32,7 +30,7 @@ public class Barracks extends MyUnit {
                 if (message.unitCode == ENEMY_ARMY_COUNT_REPORT) {
                     this.maxTroops = message.unitId;
                     this.calculateMaxTroops();
-                    this.uc.println("Base received enemy army size signal. Size: " + this.maxTroops);
+                    this.uc.println("Barracks received enemy army size signal. Size: " + this.maxTroops);
                 }
             }
         }
@@ -43,21 +41,11 @@ public class Barracks extends MyUnit {
             if (spawnRandom(UnitType.AXEMAN))
                 this.axemen++;
         }
-
-        if (this.spearmen < this.maxSpearmen) {
-            if (spawnRandom(UnitType.SPEARMAN))
-                this.spearmen++;
-        }
     }
 
     void calculateMaxTroops() {
-        int tempAxemen = (this.maxTroops * 2 / 3);
-        int tempSpearmen = this.maxTroops - tempAxemen;
-        if (tempAxemen > this.maxAxemen) {
-            this.maxAxemen = tempAxemen;
-        }
-        if (tempSpearmen > this.maxSpearmen) {
-            this.maxSpearmen = tempSpearmen;
+        if (this.maxTroops > this.maxAxemen) {
+            this.maxAxemen = this.maxTroops;
         }
     }
 }
