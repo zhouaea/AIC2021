@@ -103,8 +103,10 @@ public class Explorer extends MyUnit {
     this.uc.println("Number of counted enemies: " + this.seenEnemies.size());
 
     // count water
-    this.countWater();
-    this.uc.println("Number of counted water tiles: " + this.seenWater.size());
+    if (this.seenWater.size() < this.waterTileThreshold) {
+      this.countWater();
+      this.uc.println("Number of counted water tiles: " + this.seenWater.size());
+    }
 
     this.uc.println("Energy used before moving: " + this.uc.getEnergyUsed());
 
