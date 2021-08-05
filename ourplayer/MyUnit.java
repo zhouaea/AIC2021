@@ -95,11 +95,16 @@ public abstract class MyUnit {
     /**
      * Send a location of interest and its contents.
      * @param location the location with a point of interest
-     * @param unitCode an integer that corresponds to a unit in the game. See constants in the MyUnit class.
-     * @param unitAmount an integer from 0-15 that signifies how many units there are. If the number is 15, it could
+     * @param unitCode an 4 bit integer (from 0-15) that corresponds to a unit in the game. See constants in the MyUnit class.
+     * @param unitAmount a 4 bit integer that signifies how many units there are. If the number is 15, it could
      *                   mean 15+ of that unit. If number is greater than 100, we will divide the number by 100 to stay
      *                   within the bit limit.
      * @return a 32 bit integer with the encoded information.
+     * bits 0-13 are for location, with 7 bits used for each coordinate (0-127)
+     * bit 14-17 are for the unit code
+     * bits 18-21 are for the unit amount
+     * bits 22-31 are for the identifier (leaving a a 1 / 2^10 chance of mistaking an enemy smoke signal for an
+     *  ally smoke signal, or a 0.09% chance that an enemy smoke signal is ours)
      */
     int encodeSmokeSignal(Location location, int unitCode, int unitAmount) {
         // Divide amount by 100 if unit is a resource.
@@ -112,10 +117,13 @@ public abstract class MyUnit {
             unitAmount = 15;
         }
 
-        // Shift teamIdentifier 9 spaces, and shift unitAmount 5 spaces.
-        int extra_info = teamIdentifier * 512 + (unitAmount & 511) * 32 + unitCode;
-        // Shift extra info (teamIdentifier + unitAmount + unitCode) 16 spaces.
+        // Shift teamIdentifier 8 spaces, and shift unitAmount 4 spaces.
+        int extra_info = teamIdentifier * 256 + unitAmount * 16 + unitCode;
+        // Shift extra info (teamIdentifier + unitAmount + unitCode) 14 spaces.
         int message = extra_info * 128 * 128 + encodeLocation(location);
+        uc.println("unitCode to send: " + unitCode);
+        uc.println("unitAmount to send: " + unitAmount);
+        uc.println("location to encode: " + location);
 
         return message;
     }
@@ -132,7 +140,7 @@ public abstract class MyUnit {
         }
 
         // Shift teamIdentifier 9 spaces, and shift unitAmount 5 spaces.
-        int extra_info = teamIdentifier * 512 + (unitAmount & 511) * 32 + unitCode;
+        int extra_info = teamIdentifier * 256 + unitAmount * 16 + unitCode;
         // Shift extra info (teamIdentifier + unitAmount + unitCode) 16 spaces.
         int message = extra_info * 128 * 128 + unitId;
 
@@ -157,17 +165,18 @@ public abstract class MyUnit {
         // Quick fix for the case that the message is for assigning a builder.
         int originalCodedMessage = codedMessage;
 
-        // unitCode is bits 16 - 20
+        // unitCode is bits 14-17
         codedMessage = codedMessage / 128 / 128;
-        int unitCode = 31 & codedMessage;
+        int unitCode = 15 & codedMessage;
 
-        // unitAmount is bits 21-24
-        codedMessage = codedMessage / 32;
+        // unitAmount is bits 18-21
+        codedMessage = codedMessage / 16;
         int unitAmount = 15 & codedMessage;
 
-        // identifier is bits 25-31
+        // identifier is bits 21-31
         codedMessage = codedMessage / 16;
         int identifier = codedMessage;
+        uc.println("identifier: " + identifier);
 
         // Only decode message if we are 99% certain that the message is ours.
         DecodedMessage decodedMessage;
@@ -182,6 +191,9 @@ public abstract class MyUnit {
                 if (unitCode == WOOD || unitCode == FOOD || unitCode == STONE) {
                     unitAmount *= 100;
                 }
+                uc.println("unitCode decoded: " + unitCode);
+                uc.println("unitAmount decoded: " + unitAmount);
+                uc.println("location decoded: " + location);
                 decodedMessage = new DecodedMessage(location, unitCode, unitAmount);
             }
         } else {
@@ -192,10 +204,12 @@ public abstract class MyUnit {
     }
 
     Location decodeLocation(Location current_location, int code) {
-        int encodedY = 255 & code; // encoded y coordinate is first 8 bits
-        int encodedX = 255 & (code / 128);  // encoded x coordinate is bits 8-15
+        int encodedY = 127 & code; // encoded y coordinate is first 7 bits
+        int encodedX = 127 & (code / 128);  // encoded x coordinate is bits 8-15
+        uc.println("encodedX: " + encodedX);
+        uc.println("encodedY: " + encodedY);
 
-        // Get close to the offset by getting rid of the remainder bits of the current location.
+        // Get close to the offset by getting rid of the remainder bits of the decoder's current location.
         int offsetX = (current_location.x / 128) * 128;
         int offsetY = (current_location.y / 128) * 128;
 
@@ -327,11 +341,9 @@ public abstract class MyUnit {
                 }
             // Otherwise, the destination is reached when the unit steps on a tile adjacent to the destination.
             } else {
-                uc.println("base sensed");
                 for (Direction dir : dirs) {
                     Location alternative = destination.add(dir);
                     if (currentLocation.isEqual(alternative)) {
-                        uc.println("base reached");
                         destination = alternative;
                         break;
                     }

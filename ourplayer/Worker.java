@@ -44,13 +44,17 @@ public class Worker extends MyUnit {
     int quarries = 0;
 
     void playRound(){
+        if (uc.getInfo().getID() == 4264 && uc.getRound() == 223) {
+            uc.println("hello");
+        }
+
         // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
         // TODO use DFS for builder pathfinding instead of bug2, since bug2 will go around entire map to reach location sometimes
         // TODO Have worker build a barrack for its first building
         // TODO come up with faster way for builder to place buildings along lattice structure
         // If just created, store team's base location.
         if (!knowsPlaceToDeposit) {
-            rememberBaseLocation();
+            rememberDepositLocation();
         }
 
         senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first priority.
@@ -89,10 +93,10 @@ public class Worker extends MyUnit {
         uc.println(uc.getEnergyLeft());
     }
 
-    void rememberBaseLocation() {
+    void rememberDepositLocation() {
         UnitInfo[] surroundingUnits = uc.senseUnits(team);
         for (UnitInfo unit : surroundingUnits) {
-            if (unit.getType() == UnitType.BASE) {
+            if (unit.getType() == UnitType.BASE || unit.getType() == UnitType.SETTLEMENT) {
                 depositLocation = unit.getLocation();
             }
         }
@@ -123,9 +127,7 @@ public class Worker extends MyUnit {
                 else if (message.unitCode == FOOD)
                     low_priority_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
                 else if (message.unitCode == ASSIGN_BARRACK_BUILDER) {
-                    uc.println("id received: " + message.unitId);
                     if (uc.getInfo().getID() == message.unitId) {
-                        uc.println("is barrack building");
                         isBarrackBuilding = true;
                     }
                 } else if (message.unitCode == ASSIGN_BUILDER) {
@@ -135,7 +137,6 @@ public class Worker extends MyUnit {
                     }
                 } else if (message.unitCode == BUILDING_LOCATION) {
                     buildingLocations.add(message.location);
-                    uc.println("building location received");
                 }
             }
         }
@@ -164,7 +165,7 @@ public class Worker extends MyUnit {
             }
         }
 
-        // If the total amount of resources in sight exceeds 300, build a settlement, if a deposit isn't nearby.
+        // If the total amount of resources in sight exceeds a threshold, build a settlement, if a deposit isn't nearby.
         if (resourceInArea >= RESOURCE_THRESHOLD_FOR_SETTLEMENT && !checkForDeposit()) {
             spawnRandomSettlement();
         }
@@ -420,19 +421,6 @@ public class Worker extends MyUnit {
             if (uc.canDeposit()) {
                 uc.deposit();
                 isDepositing = false;
-
-//                if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
-//                    // Ensure that one barrack is placed near the unit's deposit location once barracks are unlocked.
-//                    if (!checkForBarrack())
-//                        spawnBarrack();
-//                }
-
-//                // TODO activate building mode if the base is in the worker's vision range?
-//                // Once worker has deposited resources, jobs is unlocked, and it has a build location, isBuilding = true.
-//                if (uc.hasResearched(Technology.JOBS, team) && !buildingLocations.isEmpty()) {
-//                    isBuilding = true;
-//                    uc.println("switching to building mode");
-//                }
             }
         }
     }
@@ -454,14 +442,18 @@ public class Worker extends MyUnit {
             // TODO the logic of the if statement doesn't cover all cases...
             if (!messagesToSend.isEmpty()) {
                 if (maxResourcesCarried == 0 && ((maxResourceAmountAtLocation >= 100 && !uc.hasResearched(Technology.BOXES, team)) || (maxResourceAmountAtLocation >= 200 && uc.hasResearched(Technology.BOXES, team)))) {
-                    if (uc.canMakeSmokeSignal())
+                    if (uc.canMakeSmokeSignal()) {
                         // right now we just send with FIFO principle.
                         uc.makeSmokeSignal(encodeResourceMessage(messagesToSend.remove(0)));
+                    }
                 }
             }
 
             uc.gatherResources();
             uc.println("gathering resources");
+        // If there are no resources left, but the unit hasn't filled up on resources, find other resources.
+        } else if (max(uc.senseResourceInfo(uc.getLocation())) == 0) {
+            isMining = false;
         // If the unit can't get resources, deposit resources at base.
         } else {
             isMining = false;
@@ -525,7 +517,6 @@ public class Worker extends MyUnit {
         // in the resource_list.
 
         currentFoundResourceIndex = findClosestResourceIndex();
-
         bug2(uc.getLocation(), found_resources.get(currentFoundResourceIndex).location, false);
     }
 
