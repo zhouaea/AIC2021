@@ -40,7 +40,7 @@ public class Settlement extends MyUnit {
 
         for (ResourceInfo resource: resources) {
             // Don't count a resource under a settlement.
-            if (location != resource.location)
+            if (!locationHasSettlement(resource.location))
                 totalResourceAmount += resource.amount;
         }
 
@@ -55,6 +55,18 @@ public class Settlement extends MyUnit {
                 spawnRandom(UnitType.WORKER);
             }
         }
+    }
+
+    private boolean locationHasSettlement(Location resourceLocation) {
+        if (uc.canSenseLocation(resourceLocation)) {
+            UnitInfo unitAtLocation = uc.senseUnitAtLocation(resourceLocation);
+            // Worker does not exist.
+            if (unitAtLocation == null) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     void decodeMessages() {
