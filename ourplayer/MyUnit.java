@@ -10,8 +10,8 @@ public abstract class MyUnit {
     final int WOOD = 1;
     final int STONE = 2;
     final int FOOD = 3;
-    final int PLACEHOLDER_1 = 4;
-    final int ENEMY_WORKER = 5;
+    final int ASSIGN_BARRACK_BUILDER = 4;
+    final int ENEMY_ARMY_COUNT_REPORT = 5;
     final int ENEMY_EXPLORER = 6;
     final int ENEMY_TRAPPER = 7;
     final int ENEMY_AXEMAN = 8;
@@ -120,7 +120,7 @@ public abstract class MyUnit {
         return message;
     }
 
-    int encodeSmokeSignal(int unitID, int unitCode, int unitAmount) {
+    int encodeSmokeSignal(int unitId, int unitCode, int unitAmount) {
         // Divide amount by 100 if unit is a resource.
         if (unitCode >= WOOD && unitCode <= FOOD) {
             unitAmount /= 100;
@@ -134,7 +134,7 @@ public abstract class MyUnit {
         // Shift teamIdentifier 9 spaces, and shift unitAmount 5 spaces.
         int extra_info = teamIdentifier * 512 + (unitAmount & 511) * 32 + unitCode;
         // Shift extra info (teamIdentifier + unitAmount + unitCode) 16 spaces.
-        int message = extra_info * 128 * 128 + unitID;
+        int message = extra_info * 128 * 128 + unitId;
 
         return message;
     }
@@ -173,7 +173,7 @@ public abstract class MyUnit {
         DecodedMessage decodedMessage;
         if (identifier == teamIdentifier) {
             // If this message is for assigning a builder, the location field is now used to mention a unit id.
-            if (unitCode == ASSIGN_BUILDER) {
+            if (unitCode == ASSIGN_BUILDER || unitCode == ASSIGN_BARRACK_BUILDER) {
                 int unitId = originalCodedMessage % (128 * 128);
                 decodedMessage = new DecodedMessage(unitId, unitCode, unitAmount);
             } else {

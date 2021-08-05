@@ -31,6 +31,7 @@ public class Worker extends MyUnit {
     boolean isMining = false;
 
     boolean isBuilding = false;
+    boolean isBarrackBuilding = false;
 
     boolean isDepositing = false;
     boolean knowsPlaceToDeposit = false;
@@ -62,8 +63,10 @@ public class Worker extends MyUnit {
         keepTorchLit();
         uc.println(uc.getEnergyLeft());
 
-        if (isBuilding) {
-            spawnBuilding(); // once jobs is unlocked, spawn 20 buildings max
+        if (isBarrackBuilding) {
+            spawnBarrack();
+        } else if (isBuilding) {
+            spawnBuildings(); // once jobs is unlocked, spawn 20 buildings max
             uc.println("building");
         }
         // Hunting takes precedence over depositing (can kill deer on the way).
@@ -119,17 +122,20 @@ public class Worker extends MyUnit {
                     low_priority_resources.add(new ResourceInfo(Resource.STONE, message.unitAmount, message.location));
                 else if (message.unitCode == FOOD)
                     low_priority_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
-                else if (message.unitCode == BUILDING_LOCATION) {
-                    buildingLocations.add(message.location);
-                    uc.println("building location received");
+                else if (message.unitCode == ASSIGN_BARRACK_BUILDER) {
+                    uc.println("id received: " + message.unitId);
+                    if (uc.getInfo().getID() == message.unitId) {
+                        uc.println("is barrack building");
+                        isBarrackBuilding = true;
+                    }
                 } else if (message.unitCode == ASSIGN_BUILDER) {
-                    int unitId = message.unitId;
-
                     // If the assign builder message refers to the worker's id, they are the designated builder.
-                    uc.println("Decoded id : " + unitId);
-                    if (uc.getInfo().getID() == unitId) {
+                    if (uc.getInfo().getID() == message.unitId) {
                         isBuilding = true;
                     }
+                } else if (message.unitCode == BUILDING_LOCATION) {
+                    buildingLocations.add(message.location);
+                    uc.println("building location received");
                 }
             }
         }
@@ -160,7 +166,7 @@ public class Worker extends MyUnit {
 
         // If the total amount of resources in sight exceeds 300, build a settlement, if a deposit isn't nearby.
         if (resourceInArea >= RESOURCE_THRESHOLD_FOR_SETTLEMENT && !checkForDeposit()) {
-            spawnRandom(UnitType.SETTLEMENT);
+            spawnRandomSettlement();
         }
 
         // If the worker is set on a resource target
@@ -198,6 +204,30 @@ public class Worker extends MyUnit {
         }
 
         return false;
+    }
+
+    /**
+     * Randomly place settlement, prioritizing a location with no resources on it.
+     */
+    private void spawnRandomSettlement() {
+        Location currentLocation = uc.getLocation();
+
+        for (Direction dir : dirs){
+            // Try to place settlement on a location with no resources.
+            if (max(uc.senseResourceInfo(currentLocation.add(dir))) == 0) {
+                if (uc.canSpawn(UnitType.SETTLEMENT, dir)){
+                    uc.spawn(UnitType.SETTLEMENT, dir);
+                    return;
+                }
+            }
+        }
+
+        // If there are no adjacent locations without resources, place the settlement anywhere.
+        for (Direction dir : dirs){
+            if (uc.canSpawn(UnitType.SETTLEMENT, dir)){
+                uc.spawn(UnitType.SETTLEMENT, dir);
+            }
+        }
     }
 
     private boolean locationHasAnotherWorker(Location resourceLocation) {
@@ -266,9 +296,25 @@ public class Worker extends MyUnit {
         }
     }
 
+
+     void spawnBarrack() {
+        Location potentialLocation;
+        for (Direction dir : dirs) {
+            if (uc.canSpawn(UnitType.BARRACKS, dir)) {
+                potentialLocation = uc.getLocation().add(dir);
+                // If potential location is within lattice structure, place a barrack there.
+                if ((potentialLocation.x % 2 == depositLocation.x % 2 && potentialLocation.y % 2 == depositLocation.y % 2) || (potentialLocation.x % 2 != depositLocation.x % 2 && potentialLocation.y % 2 != depositLocation.y % 2)) {
+                    uc.spawn(UnitType.BARRACKS, dir);
+                    isBarrackBuilding = false;
+                    break;
+                }
+            }
+        }
+    }
+
     // Move adjacent to building location and place a building there. Choose a different build location if a building
     // has already been placed. If a unit that is not a building is currently on the location, wait until it moves.
-    void spawnBuilding() {
+    void spawnBuildings() {
         if (!hasCalculatedBuildingLocations) {
             calculateBuildingLocations();
         }
@@ -387,40 +433,6 @@ public class Worker extends MyUnit {
 //                    isBuilding = true;
 //                    uc.println("switching to building mode");
 //                }
-            }
-        }
-    }
-
-    /**
-     *  Helper function for deposit
-     *  @return if there is a barrack in the unit's vision radius
-     */
-    private boolean checkForBarrack() {
-        UnitInfo[] unitsNearby = uc.senseUnits();
-        for (UnitInfo unit : unitsNearby) {
-            if (unit.getTeam() == team) {
-                if (unit.getType() == UnitType.BARRACKS)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Helper function for deposit
-     * Spawn a barrack on a location that would fit a lattice structur.
-     */
-    private void spawnBarrack() {
-        Location potentialLocation;
-        for (Direction dir : dirs) {
-            if (uc.canSpawn(UnitType.BARRACKS, dir)) {
-                potentialLocation = uc.getLocation().add(dir);
-                // If potential location is within lattice structure, place a barrack there.
-                if ((potentialLocation.x % 2 == depositLocation.x % 2 && potentialLocation.y % 2 == depositLocation.y % 2) || potentialLocation.x % 2 != depositLocation.x % 2 && potentialLocation.y % 2 != depositLocation.y % 2) {
-                    uc.spawn(UnitType.BARRACKS, dir);
-                    break;
-                }
             }
         }
     }
