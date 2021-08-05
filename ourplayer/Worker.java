@@ -126,6 +126,8 @@ public class Worker extends MyUnit {
                     low_priority_resources.add(new ResourceInfo(Resource.STONE, message.unitAmount, message.location));
                 else if (message.unitCode == FOOD)
                     low_priority_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
+                else if (message.unitCode == ENEMY_BASE)
+                    enemyBaseLocation = message.location;
                 else if (message.unitCode == ASSIGN_BARRACK_BUILDER) {
                     if (uc.getInfo().getID() == message.unitId) {
                         isBarrackBuilding = true;

@@ -9,12 +9,17 @@ public class Settlement extends MyUnit {
 
     final int ResourcesPerWorkerSpawnThreshold = 400;
 
+    boolean broadcastEnemyBaseLocation = false;
+    final int CHANCE_OF_BROADCASTING_ENEMY_BASE_LOCATION = 100;
+
     Settlement(UnitController uc){
         super(uc);
     }
 
     void playRound() {
         spawnWorkers();
+        decodeMessages();
+        sendEnemyBaseLocation();
     }
 
     /**
@@ -48,6 +53,35 @@ public class Settlement extends MyUnit {
             // if there are resources in the area, and not enough workers per resource, spawn a worker.
             if (totalResourceAmount / workersInArea > ResourcesPerWorkerSpawnThreshold) {
                 spawnRandom(UnitType.WORKER);
+            }
+        }
+    }
+
+    void decodeMessages() {
+        int[] smokeSignals = uc.readSmokeSignals();
+        Location currentLocation = uc.getLocation();
+        DecodedMessage message;
+
+        for (int smokeSignal : smokeSignals) {
+            message = decodeSmokeSignal(currentLocation, smokeSignal);
+            if (message.unitCode == ENEMY_BASE)
+                enemyBaseLocation = message.location;
+        }
+    }
+
+    /**
+     * If the settlement knows the location of the enemy base, broadcast it every 1/100 turns.
+     */
+    void sendEnemyBaseLocation() {
+        int randomNumber = (int) (uc.getRandomDouble() * 100);
+        if (randomNumber == 0) {
+            broadcastEnemyBaseLocation = true;
+        }
+
+        if (broadcastEnemyBaseLocation) {
+            if (uc.canMakeSmokeSignal()) {
+                uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
+                broadcastEnemyBaseLocation = false;
             }
         }
     }

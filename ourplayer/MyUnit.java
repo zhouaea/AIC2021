@@ -32,6 +32,8 @@ public abstract class MyUnit {
     Location closestLocation = null;
     Direction bugDirection = null;
 
+    Location enemyBaseLocation = null;
+
 
     MyUnit(UnitController uc){
         this.uc = uc;
@@ -269,7 +271,7 @@ public abstract class MyUnit {
         return bestLocationSoFar;
     }
 
-    /** Left handed bug that attempts to stay in a straight line.
+    /** Left handed bug that attempts to stay in a straight line, avoiding attacks if it can.
      * @param currentLocation
      * @param destination
      * @return true if at location, false if still moving towards it.
@@ -293,10 +295,16 @@ public abstract class MyUnit {
             uc.println("closest location: " + closestLocation);
 
         // If the bot is on the closest location it has been in, attempt to move in a straight line from location to destination.
+        // Don't do this if moving to a tile would cause their death
         if (closestLocation == null || currentLocation.distanceSquared(destination) < closestLocation.distanceSquared(destination)) {
             closestLocation = currentLocation;
+
             bugDirection = currentLocation.directionTo(destination);
-            uc.move(bugDirection);
+
+            if (isSafeToMove(currentLocation.add(bugDirection)))
+                uc.move(bugDirection);
+            else
+                leftBug();
         }
         // If this is not possible, keep bot's left side on obstacle until it moves to a closer location than it had before.
         else {
@@ -310,10 +318,10 @@ public abstract class MyUnit {
      */
     private void leftBug() {
         uc.println("navigate around obstacle");
-        // Rotate right until the bot can move forward
+        // Rotate right until the bot can move forward without dying.
         int i = 0;
         for (i = 0; i < 8; i++) {
-            if (uc.canMove(bugDirection)) {
+            if (uc.canMove(bugDirection) && isSafeToMove(uc.getLocation().add(bugDirection))) {
                 uc.move(bugDirection);
                 break;
             }
@@ -357,6 +365,29 @@ public abstract class MyUnit {
         }
 
         return false;
+    }
+
+    boolean isSafeToMove(Location loc) {
+        if (uc.hasTrap(loc))
+            return false;
+
+        // Factor in the attack radius of the enemy base, if its location is known.
+        if (enemyBaseLocation != null)
+            if (loc.distanceSquared(enemyBaseLocation) <= UnitType.BASE.getAttackRange())
+                return false;
+
+        // Factor in the attack radius of surrounding enemy troops, if the unit is not a defensive troop.
+        if (uc.getType() != UnitType.WORKER || uc.getType() == UnitType.EXPLORER || uc.getType() == UnitType.TRAPPER) {
+            UnitInfo[] enemyUnits = uc.senseUnits(uc.getTeam().getOpponent());
+            for (UnitInfo unit : enemyUnits) {
+                int attackRange = unit.getType().getAttackRange();
+
+                if (loc.distanceSquared(unit.getLocation()) <= attackRange)
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     /**
