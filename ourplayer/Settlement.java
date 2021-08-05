@@ -17,6 +17,10 @@ public class Settlement extends MyUnit {
     }
 
     void playRound() {
+        if (uc.getInfo().getID() == 2577 && uc.getRound() == 96) {
+            uc.println("hello");
+        }
+
         spawnWorkers();
         decodeMessages();
         sendEnemyBaseLocation();
@@ -75,15 +79,17 @@ public class Settlement extends MyUnit {
      * If the settlement knows the location of the enemy base, broadcast it every 1/100 turns.
      */
     void sendEnemyBaseLocation() {
-        int randomNumber = (int) (uc.getRandomDouble() * 100);
-        if (randomNumber == 0) {
-            broadcastEnemyBaseLocation = true;
-        }
+        if (enemyBaseLocation != null) {
+            int randomNumber = (int) (uc.getRandomDouble() * 100);
+            if (randomNumber == 0) {
+                broadcastEnemyBaseLocation = true;
+            }
 
-        if (broadcastEnemyBaseLocation) {
-            if (uc.canMakeSmokeSignal()) {
-                uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
-                broadcastEnemyBaseLocation = false;
+            if (broadcastEnemyBaseLocation) {
+                if (uc.canMakeSmokeSignal()) {
+                    uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
+                    broadcastEnemyBaseLocation = false;
+                }
             }
         }
     }
