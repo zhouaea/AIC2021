@@ -41,10 +41,11 @@ public class Worker extends MyUnit {
     boolean knowsPlaceToDeposit = false;
     Location depositLocation;
 
-    Direction currentDir = Direction.NORTH;
+    int randomDirectionIndex = (int) (uc.getRandomDouble() * 9);
+    Direction currentDir = dirs[randomDirectionIndex];
 
     void playRound(){
-        if (uc.getInfo().getID() == 2832 && uc.getRound() == 665) {
+        if (uc.getInfo().getID() == 4543 && uc.getRound() == 192) {
             uc.println("hello");
         }
         // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
@@ -215,11 +216,11 @@ public class Worker extends MyUnit {
         Location currentLocation = uc.getLocation();
         Location potentialLocation;
 
-        for (Direction dir : dirs){
-            // Try to place settlement on a location with no resources.
-            potentialLocation = currentLocation.add((dir));
-            if (!uc.isOutOfMap(potentialLocation) && max(uc.senseResourceInfo(potentialLocation)) == 0) {
-                if (uc.canSpawn(UnitType.SETTLEMENT, dir)) {
+        for (Direction dir : dirs) {
+            potentialLocation = currentLocation.add(dir);
+            if (uc.canSpawn(UnitType.SETTLEMENT, dir)) {
+                // Try to place settlement on a location with no resources.
+                if (max(uc.senseResourceInfo(potentialLocation)) == 0) {
                     uc.spawn(UnitType.SETTLEMENT, dir);
                     return;
                 }
@@ -230,6 +231,7 @@ public class Worker extends MyUnit {
         for (Direction dir : dirs){
             if (!uc.isOutOfMap(currentLocation.add(dir)) && uc.canSpawn(UnitType.SETTLEMENT, dir)){
                 uc.spawn(UnitType.SETTLEMENT, dir);
+                return;
             }
         }
     }
@@ -263,10 +265,11 @@ public class Worker extends MyUnit {
         UnitInfo[] unitsNearby = uc.senseUnits();
         for (UnitInfo unit : unitsNearby) {
             if (unit.getTeam() == team) {
-                if (unit.getType() == UnitType.SETTLEMENT)
+                if (unit.getType() == UnitType.SETTLEMENT) {
                     if (uc.getLocation().distanceSquared(unit.getLocation()) < uc.getLocation().distanceSquared(depositLocation)) {
                         depositLocation = unit.getLocation();
                     }
+                }
             }
         }
     }
@@ -290,10 +293,12 @@ public class Worker extends MyUnit {
         UnitInfo[] enemyUnits = uc.senseUnits(enemy);
 
         for (UnitInfo enemyUnit : enemyUnits) {
-            if (enemyUnit.getType() == UnitType.WORKER) {
-                currentEnemyWorkerLocation = enemyUnit.getLocation();
-                isFightingEnemyWorkers = true;
-                return;
+            if (enemyUnit.getTeam() == enemy) {
+                if (enemyUnit.getType() == UnitType.WORKER) {
+                    currentEnemyWorkerLocation = enemyUnit.getLocation();
+                    isFightingEnemyWorkers = true;
+                    return;
+                }
             }
         }
 
@@ -452,7 +457,7 @@ public class Worker extends MyUnit {
      */
     void deposit() {
         if (depositLocation != null) {
-            // Unit can only deposit once unit has reached its deposit location.
+            // Unit can only deposit once it has reached its deposit location.
             if (bug2(uc.getLocation(), depositLocation, true)) {
                 if (uc.canDeposit()) {
                     uc.deposit();
