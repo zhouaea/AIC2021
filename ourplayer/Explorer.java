@@ -3,13 +3,7 @@ package ourplayer;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-import aic2021.user.Direction;
-import aic2021.user.Location;
-import aic2021.user.ResourceInfo;
-import aic2021.user.Team;
-import aic2021.user.UnitController;
-import aic2021.user.UnitInfo;
-import aic2021.user.UnitType;
+import aic2021.user.*;
 
 public class Explorer extends MyUnit {
 
@@ -17,9 +11,10 @@ public class Explorer extends MyUnit {
     boolean sentSignal = false;
     boolean baseFound = false;
     boolean sentWaterSignal = false;
+    boolean settlementCreated = false;
 
     final int visitedID = 71920;
-    final int waterTileThreshold = 15;
+    final int waterTileThreshold = 5;
 
     Direction currentDir;
 
@@ -44,19 +39,23 @@ public class Explorer extends MyUnit {
     }
 
     void playRound() {
+        decodeMessages();
+
         // sets initial direction at spawn
         if (!this.initDirSet) {
             this.currentDir = Direction.NORTH;
             this.initDirSet = true;
         }
 
-        // try to send enemy base location smoke signal
-        if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
-            int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
-            this.uc.makeSmokeSignal(signal);
-            this.uc.println(
-                    "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
-            this.sentSignal = true;
+        // try to send enemy base location smoke signal once a settlement has been created.
+        if (settlementCreated) {
+            if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
+                int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
+                this.uc.makeSmokeSignal(signal);
+                this.uc.println(
+                        "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
+                this.sentSignal = true;
+            }
         }
 
         // try to send resource location smoke signal (at most every 30 rounds)
@@ -74,13 +73,15 @@ public class Explorer extends MyUnit {
         // Try to send army size smoke signal (at most every 49 rounds).
         if (this.uc.getRound() % 49 == 0) {
             if (this.uc.canMakeSmokeSignal()) {
-                int enemyArmySize = this.seenEnemies.size();
-                this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
-                this.uc.println(
-                        "Enemy army size smoke signal fired on round "
-                                + this.uc.getRound()
-                                + ". Enemies: "
-                                + enemyArmySize);
+                if (!this.seenEnemies.isEmpty()) {
+                    int enemyArmySize = this.seenEnemies.size();
+                    this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
+                    this.uc.println(
+                            "Enemy army size smoke signal fired on round "
+                                    + this.uc.getRound()
+                                    + ". Enemies: "
+                                    + enemyArmySize);
+                }
             }
         }
 
@@ -91,6 +92,9 @@ public class Explorer extends MyUnit {
                 if (uc.canMakeSmokeSignal()) {
                     this.uc.makeSmokeSignal(encodeSmokeSignal(0, BUY_RAFTS, 0));
                     this.sentWaterSignal = true;
+                    this.uc.println(
+                            "Build raft signal fired on round "
+                                    + this.uc.getRound());
                 }
             }
         }
@@ -120,6 +124,22 @@ public class Explorer extends MyUnit {
         // look for resources
         if (this.uc.getRound() > 100) {
             this.findResources();
+        }
+    }
+
+    void decodeMessages() {
+        int[] smokeSignals = uc.readSmokeSignals();
+        Location currentLocation = uc.getLocation();
+        DecodedMessage message;
+
+        for (int smokeSignal : smokeSignals) {
+            message = decodeSmokeSignal(currentLocation, smokeSignal);
+            if (message != null) {
+                if (message.unitCode == SETTLEMENT_CREATED) {
+                    settlementCreated = true;
+                    uc.println("a settlement has been created");
+                }
+            }
         }
     }
 

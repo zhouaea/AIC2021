@@ -32,7 +32,9 @@ public class Base extends MyUnit {
 
     // TODO If base sees traps, spawn trapper
     void playRound(){
-        checkForWater();
+        if (uc.getRound() == 0) {
+            earlyGameCheck();
+        }
         playDefense();
         countEnemies();
         spawnTroops();
@@ -43,6 +45,10 @@ public class Base extends MyUnit {
 
         uc.println("energy used: " + uc.getEnergyUsed());
         uc.println("energy left: " + uc.getEnergyLeft());
+    }
+
+    void earlyGameCheck() {
+        checkForWater();
     }
 
     void checkForWater() {

@@ -48,8 +48,7 @@ public class Worker extends MyUnit {
         if (uc.getInfo().getID() == 4543 && uc.getRound() == 192) {
             uc.println("hello");
         }
-        // TODO lattice structure can mess with bug2, we need a different pathfinding algorithm for that
-        // TODO use DFS for builder pathfinding instead of bug2, since bug2 will go around entire map to reach location sometimes
+
         // TODO come up with faster way for builder to place buildings along lattice structure
         // TODO Don't add resources in the range of the enemy base.
         // If just created, store team's base location.

@@ -7,6 +7,8 @@ public class Settlement extends MyUnit {
     Team team = uc.getTeam();
     Location location = uc.getLocation();
 
+    boolean hasAnnouncedCreation = false;
+
     final int ResourcesPerWorkerSpawnThreshold = 400;
 
     boolean broadcastEnemyBaseLocation = false;
@@ -17,9 +19,21 @@ public class Settlement extends MyUnit {
     }
 
     void playRound() {
+        if (!hasAnnouncedCreation) {
+            announceCreation();
+        }
+
         spawnWorkers();
         decodeMessages();
         sendEnemyBaseLocation();
+    }
+
+    void announceCreation() {
+        if (uc.canMakeSmokeSignal()) {
+            uc.makeSmokeSignal(encodeSmokeSignal(0, SETTLEMENT_CREATED, 0));
+            hasAnnouncedCreation = true;
+            uc.println("presence announced");
+        }
     }
 
     /**
@@ -88,7 +102,7 @@ public class Settlement extends MyUnit {
      */
     void sendEnemyBaseLocation() {
         if (enemyBaseLocation != null) {
-            int randomNumber = (int) (uc.getRandomDouble() * 100);
+            int randomNumber = (int) (uc.getRandomDouble() * CHANCE_OF_BROADCASTING_ENEMY_BASE_LOCATION);
             if (randomNumber == 0) {
                 broadcastEnemyBaseLocation = true;
             }
@@ -97,6 +111,7 @@ public class Settlement extends MyUnit {
                 if (uc.canMakeSmokeSignal()) {
                     uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
                     broadcastEnemyBaseLocation = false;
+                    uc.println("relaying enemy base location");
                 }
             }
         }
