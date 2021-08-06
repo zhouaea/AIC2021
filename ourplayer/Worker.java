@@ -286,14 +286,15 @@ public class Worker extends MyUnit {
     }
 
     /**
-     * If deer is/are found, engage in hunting mode on the closest one in sight.
+     * If units is/are found, engage in hunting mode on the closest one in sight.
      */
     void senseEnemyWorkers() {
         UnitInfo[] enemyUnits = uc.senseUnits(enemy);
 
         for (UnitInfo enemyUnit : enemyUnits) {
             if (enemyUnit.getTeam() == enemy) {
-                if (enemyUnit.getType() == UnitType.WORKER) {
+                // As long as workers can win the engagement, fight the units.
+                if (enemyUnit.getType() != UnitType.AXEMAN && enemyUnit.getType() != UnitType.WOLF) {
                     currentEnemyWorkerLocation = enemyUnit.getLocation();
                     isFightingEnemyWorkers = true;
                     return;
