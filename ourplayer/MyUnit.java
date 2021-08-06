@@ -13,7 +13,7 @@ public abstract class MyUnit {
     final int ASSIGN_BARRACK_BUILDER = 4;
     final int ENEMY_ARMY_COUNT_REPORT = 5;
     final int BUY_RAFTS = 6;
-    final int ENEMY_TRAPPER = 7;
+    final int SETTLEMENT_CREATED = 7;
     final int ENEMY_AXEMAN = 8;
     final int ENEMY_SPEARMAN=  9;
     final int ENEMY_WOLF = 10;
@@ -42,8 +42,9 @@ public abstract class MyUnit {
     abstract void playRound();
 
     boolean spawnRandom(UnitType t){
+        Location currentLocation = uc.getLocation();
         for (Direction dir : dirs){
-            if (uc.canSpawn(t, dir)){
+            if (uc.canSpawn(t, dir) && isSafeToMove(currentLocation.add(dir))){
                 uc.spawn(t, dir);
                 return true;
             }
