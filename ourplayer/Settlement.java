@@ -7,6 +7,8 @@ public class Settlement extends MyUnit {
     Team team = uc.getTeam();
     Location location = uc.getLocation();
 
+    boolean hasAnnouncedCreation = false;
+
     final int ResourcesPerWorkerSpawnThreshold = 400;
 
     boolean broadcastEnemyBaseLocation = false;
@@ -17,9 +19,21 @@ public class Settlement extends MyUnit {
     }
 
     void playRound() {
+        if (!hasAnnouncedCreation) {
+            announceCreation();
+        }
+
         spawnWorkers();
         decodeMessages();
         sendEnemyBaseLocation();
+    }
+
+    void announceCreation() {
+        if (uc.canMakeSmokeSignal()) {
+            uc.makeSmokeSignal(encodeSmokeSignal(0, SETTLEMENT_CREATED, 0));
+            hasAnnouncedCreation = true;
+            uc.println("presence announced");
+        }
     }
 
     /**
@@ -40,7 +54,7 @@ public class Settlement extends MyUnit {
 
         for (ResourceInfo resource: resources) {
             // Don't count a resource under a settlement.
-            if (location != resource.location)
+            if (!locationHasSettlement(resource.location))
                 totalResourceAmount += resource.amount;
         }
 
@@ -55,6 +69,18 @@ public class Settlement extends MyUnit {
                 spawnRandom(UnitType.WORKER);
             }
         }
+    }
+
+    private boolean locationHasSettlement(Location resourceLocation) {
+        if (uc.canSenseLocation(resourceLocation)) {
+            UnitInfo unitAtLocation = uc.senseUnitAtLocation(resourceLocation);
+            // Worker does not exist.
+            if (unitAtLocation == null) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     void decodeMessages() {
@@ -75,15 +101,18 @@ public class Settlement extends MyUnit {
      * If the settlement knows the location of the enemy base, broadcast it every 1/100 turns.
      */
     void sendEnemyBaseLocation() {
-        int randomNumber = (int) (uc.getRandomDouble() * 100);
-        if (randomNumber == 0) {
-            broadcastEnemyBaseLocation = true;
-        }
+        if (enemyBaseLocation != null) {
+            int randomNumber = (int) (uc.getRandomDouble() * CHANCE_OF_BROADCASTING_ENEMY_BASE_LOCATION);
+            if (randomNumber == 0) {
+                broadcastEnemyBaseLocation = true;
+            }
 
-        if (broadcastEnemyBaseLocation) {
-            if (uc.canMakeSmokeSignal()) {
-                uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
-                broadcastEnemyBaseLocation = false;
+            if (broadcastEnemyBaseLocation) {
+                if (uc.canMakeSmokeSignal()) {
+                    uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
+                    broadcastEnemyBaseLocation = false;
+                    uc.println("relaying enemy base location");
+                }
             }
         }
     }

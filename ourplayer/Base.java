@@ -1,15 +1,8 @@
 package ourplayer;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import aic2021.user.*;
 
-import aic2021.user.Location;
-import aic2021.user.ResourceInfo;
-import aic2021.user.Team;
-import aic2021.user.Technology;
-import aic2021.user.UnitController;
-import aic2021.user.UnitInfo;
-import aic2021.user.UnitType;
+import java.util.HashSet;
 
 public class Base extends MyUnit {
 
@@ -39,16 +32,23 @@ public class Base extends MyUnit {
 
   // TODO If base sees traps, spawn trapper
   void playRound(){
-    checkForWater();
+    if (uc.getRound() == 0) {
+      earlyGameCheck();
+    }
     playDefense();
     countEnemies();
     spawnTroops();
+    decodeMessages();
     researchTech(); // TODO change research path based on different states like "normal", "water", etc.
     makeBuilders();
 
 
     uc.println("energy used: " + uc.getEnergyUsed());
     uc.println("energy left: " + uc.getEnergyLeft());
+  }
+
+  void earlyGameCheck() {
+    checkForWater();
   }
 
   void checkForWater() {
@@ -199,12 +199,22 @@ public class Base extends MyUnit {
     }
   }
 
-  // TODO send smoke signals to workers about resources in range
-  void senseTerrain() {
-    // Sense terrain in range, and maybe let troops know about important spots.
-    Location[] water_tiles = uc.senseWater(50);
-    Location[] mountain_tiles = uc.senseMountains(50);
+  void decodeMessages() {
+    int[] smokeSignals = uc.readSmokeSignals();
+    Location currentLocation = uc.getLocation();
+    DecodedMessage message;
+
+    for (int smokeSignal : smokeSignals) {
+      message = decodeSmokeSignal(currentLocation, smokeSignal);
+      if (message != null) {
+        if (message.unitCode == BUY_RAFTS) {
+          waterMode = true;
+          uc.println("water mode activated");
+        }
+      }
+    }
   }
+
 
 
   void makeBuilders() {

@@ -1,15 +1,8 @@
 package ourplayer;
 
-import java.util.ArrayList;
+import aic2021.user.*;
 
-import aic2021.user.Direction;
-import aic2021.user.Location;
-import aic2021.user.Resource;
-import aic2021.user.ResourceInfo;
-import aic2021.user.Team;
-import aic2021.user.UnitController;
-import aic2021.user.UnitInfo;
-import aic2021.user.UnitType;
+import java.util.*;
 
 public abstract class MyUnit {
     // Have to use constants since enums use static variables.
@@ -19,8 +12,8 @@ public abstract class MyUnit {
     final int FOOD = 3;
     final int ASSIGN_BARRACK_BUILDER = 4;
     final int ENEMY_ARMY_COUNT_REPORT = 5;
-    final int ENEMY_EXPLORER = 6;
-    final int ENEMY_TRAPPER = 7;
+    final int BUY_RAFTS = 6;
+    final int SETTLEMENT_CREATED = 7;
     final int ENEMY_AXEMAN = 8;
     final int ENEMY_SPEARMAN=  9;
     final int ENEMY_WOLF = 10;
@@ -36,18 +29,11 @@ public abstract class MyUnit {
 
     UnitController uc;
 
-//    Team team = this.uc.getTeam();
-//    Team enemyTeam = this.uc.getOpponent();
-//    Team deerTeam = Team.NEUTRAL;
-
     Location closestLocation = null;
     Direction bugDirection = null;
 
-    Location enemyBaseLocation;
-    ArrayList<Location> dangerZone = new ArrayList<>();
+    Location enemyBaseLocation = null;
 
-    final Location teamBase = new Location(311, 317);
-    final Location enemyBase = new Location(294, 317);
 
     MyUnit(UnitController uc){
         this.uc = uc;
@@ -56,8 +42,9 @@ public abstract class MyUnit {
     abstract void playRound();
 
     boolean spawnRandom(UnitType t){
+        Location currentLocation = uc.getLocation();
         for (Direction dir : dirs){
-            if (uc.canSpawn(t, dir)){
+            if (uc.canSpawn(t, dir) && isSafeToMove(currentLocation.add(dir))){
                 uc.spawn(t, dir);
                 return true;
             }
@@ -94,7 +81,6 @@ public abstract class MyUnit {
         }
         return false;
     }
-
 
     int encodeBuildingLocation(Location buildingLocation) {
         return encodeSmokeSignal(buildingLocation, BUILDING_LOCATION, 0);
@@ -473,58 +459,5 @@ public abstract class MyUnit {
             return true;
         }
         return false;
-    }
-
-    void recordEnemyBase() {
-        if (this.uc.canReadSmokeSignals()) {
-            int[] signals = this.uc.readSmokeSignals();
-            Location currentLoc = this.uc.getLocation();
-            for (int signal : signals) {
-                DecodedMessage message = this.decodeSmokeSignal(currentLoc, signal);
-                if (message.unitCode == 0) {
-                    this.enemyBaseLocation = message.location;
-                    this.uc.println("Enemy base recorded");
-                    return;
-                }
-            }
-        }
-    }
-
-    void calculateDangerZone() {
-        this.uc.println("Energy before danger zone: " + this.uc.getEnergyUsed());
-        this.dangerZone.add(this.enemyBaseLocation.add(-1, 4));
-        this.dangerZone.add(this.enemyBaseLocation.add(0, 4));
-        this.dangerZone.add(this.enemyBaseLocation.add(1, 4));
-        this.dangerZone.add(this.enemyBaseLocation.add(1, 3));
-        this.dangerZone.add(this.enemyBaseLocation.add(2, 3));
-        this.dangerZone.add(this.enemyBaseLocation.add(3, 3));
-        this.dangerZone.add(this.enemyBaseLocation.add(3, 2));
-        this.dangerZone.add(this.enemyBaseLocation.add(3, 1));
-        this.dangerZone.add(this.enemyBaseLocation.add(4, 1));
-        this.dangerZone.add(this.enemyBaseLocation.add(4, 0));
-        this.dangerZone.add(this.enemyBaseLocation.add(4, -1));
-        this.dangerZone.add(this.enemyBaseLocation.add(3, -1));
-        this.dangerZone.add(this.enemyBaseLocation.add(3, -2));
-        this.dangerZone.add(this.enemyBaseLocation.add(3, -3));
-        this.dangerZone.add(this.enemyBaseLocation.add(2, -3));
-        this.dangerZone.add(this.enemyBaseLocation.add(1, -3));
-        this.dangerZone.add(this.enemyBaseLocation.add(1, 4));
-        this.dangerZone.add(this.enemyBaseLocation.add(-1, -4));
-        this.dangerZone.add(this.enemyBaseLocation.add(0, -4));
-        this.dangerZone.add(this.enemyBaseLocation.add(-1, -4));
-        this.dangerZone.add(this.enemyBaseLocation.add(-1, -3));
-        this.dangerZone.add(this.enemyBaseLocation.add(-2, -3));
-        this.dangerZone.add(this.enemyBaseLocation.add(-3, -3));
-        this.dangerZone.add(this.enemyBaseLocation.add(-3, -2));
-        this.dangerZone.add(this.enemyBaseLocation.add(-3, -1));
-        this.dangerZone.add(this.enemyBaseLocation.add(-4, -1));
-        this.dangerZone.add(this.enemyBaseLocation.add(-4, 0));
-        this.dangerZone.add(this.enemyBaseLocation.add(-4, 1));
-        this.dangerZone.add(this.enemyBaseLocation.add(-3, 1));
-        this.dangerZone.add(this.enemyBaseLocation.add(-3, 2));
-        this.dangerZone.add(this.enemyBaseLocation.add(-3, 3));
-        this.dangerZone.add(this.enemyBaseLocation.add(-2, 3));
-        this.dangerZone.add(this.enemyBaseLocation.add(-1, 3));
-        this.uc.println("Danger zone calculated, energy after: " + this.uc.getEnergyUsed());
     }
 }
