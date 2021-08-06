@@ -91,8 +91,6 @@ public class Explorer extends MyUnit {
                 if (uc.canMakeSmokeSignal()) {
                     this.uc.makeSmokeSignal(encodeSmokeSignal(0, BUY_RAFTS, 0));
                     this.sentWaterSignal = true;
-                    this.uc.println(
-                            "Water smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
                 }
             }
         }
@@ -102,45 +100,32 @@ public class Explorer extends MyUnit {
 
         // count enemies
         this.countEnemies();
-        this.uc.println("Number of counted enemies: " + this.seenEnemies.size());
 
         // count water
         this.countWater();
-        this.uc.println("Number of counted water tiles: " + this.seenWater.size());
-
-        this.uc.println("Energy used before moving: " + this.uc.getEnergyUsed());
 
         // handles movement
         if (!this.enemyReaction()) {
             this.betterMove3();
         }
 
-        this.uc.println("Energy used after moving: " + this.uc.getEnergyUsed());
-
         // did it find the base?
         if (!this.baseFound) {
             if (this.findBase()) {
                 this.baseFound = true;
                 this.calculateDangerZone();
-                this.uc.println("Enemy base found at " + this.enemyBaseLocation);
             }
         }
-
-        this.uc.println("Energy used after finding base: " + this.uc.getEnergyUsed());
 
         // look for resources
         if (this.uc.getRound() > 100) {
             this.findResources();
         }
-
-        this.uc.println("Energy used after finding resources: " + this.uc.getEnergyUsed());
     }
 
     void betterMove3() {
         int tries = 8;
-        this.uc.println("Energy used before optimal direction calculation: " + this.uc.getEnergyUsed());
         this.currentDir = this.optimalDirection();
-        this.uc.println("Energy used after optimal direction calculation: " + this.uc.getEnergyUsed());
         while (this.uc.canMove() && tries-- > 0) {
             if (this.uc.canMove(this.currentDir)
                     && this.validLocationCheck(this.uc.getLocation().add(this.currentDir))) {
@@ -151,7 +136,6 @@ public class Explorer extends MyUnit {
                 // mark location with rock art
                 if (this.uc.canDraw(this.visitedID)) {
                     this.uc.draw(this.visitedID);
-                    this.uc.println("Rock art drawn: " + this.visitedID);
                 }
                 return;
             } else {
@@ -274,7 +258,6 @@ public class Explorer extends MyUnit {
 
     void runAway(Direction enemy) {
         if (this.baseFound) {
-            this.uc.println("running away");
             Direction optimal = enemy.opposite();
             this.currentDir = optimal;
             //      this.visitedID++;
@@ -311,7 +294,6 @@ public class Explorer extends MyUnit {
     }
 
     void calculateDangerZone() {
-        this.uc.println("Energy before danger zone: " + this.uc.getEnergyUsed());
         this.dangerZone.add(this.enemyBaseLocation.add(-1, 4));
         this.dangerZone.add(this.enemyBaseLocation.add(0, 4));
         this.dangerZone.add(this.enemyBaseLocation.add(1, 4));
@@ -345,6 +327,5 @@ public class Explorer extends MyUnit {
         this.dangerZone.add(this.enemyBaseLocation.add(-3, 3));
         this.dangerZone.add(this.enemyBaseLocation.add(-2, 3));
         this.dangerZone.add(this.enemyBaseLocation.add(-1, 3));
-        this.uc.println("Danger zone calculated, energy after: " + this.uc.getEnergyUsed());
     }
 }
