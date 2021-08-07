@@ -9,6 +9,9 @@ public class Settlement extends MyUnit {
 
     boolean hasAnnouncedCreation = false;
 
+    boolean waterMode = false;
+    final int WATER_TILE_THRESHOLD = 1;
+
     final int ResourcesPerWorkerSpawnThreshold = 400;
 
     boolean broadcastEnemyBaseLocation = false;
@@ -21,9 +24,16 @@ public class Settlement extends MyUnit {
     void playRound() {
         if (!hasAnnouncedCreation) {
             announceCreation();
+            checkForWater();
         }
 
-        spawnWorkers();
+
+        // Only spawn workers before a certain threshold
+        if (uc.getRound() < 500 || uc.getTechLevel(team) == 0) {
+            // Make sure that spawned workers can reach resources
+            if (!waterMode || uc.hasResearched(Technology.RAFTS, team))
+                spawnWorkers();
+        }
         decodeMessages();
         sendEnemyBaseLocation();
     }
@@ -33,6 +43,14 @@ public class Settlement extends MyUnit {
             uc.makeSmokeSignal(encodeSmokeSignal(0, SETTLEMENT_CREATED, 0));
             hasAnnouncedCreation = true;
             uc.println("presence announced");
+        }
+    }
+
+    void checkForWater() {
+        Location[] waterTiles = uc.senseWater(25);
+        if (waterTiles.length >= WATER_TILE_THRESHOLD) {
+            waterMode = true;
+            uc.println("water mode activated");
         }
     }
 
