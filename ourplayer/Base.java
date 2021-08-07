@@ -29,6 +29,7 @@ public class Base extends MyUnit {
     int barrackBuilderId = 0;
     boolean hasAssignedWorkerAsBuilder = false;
     int builderId = 0;
+    boolean builderKnowsEnemyLocation = false;
 
     Base(UnitController uc){
         super(uc);
@@ -51,6 +52,16 @@ public class Base extends MyUnit {
         researchTech();
         makeBuilders();
 
+        if (hasAssignedWorkerAsBuilder && !builderKnowsEnemyLocation) {
+            if (enemyBaseLocation != null) {
+                if (uc.canMakeSmokeSignal()) {
+                    uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
+                    builderKnowsEnemyLocation = true;
+                }
+            } else {
+                builderKnowsEnemyLocation = true;
+            }
+        }
 
         uc.println("energy used: " + uc.getEnergyUsed());
         uc.println("energy left: " + uc.getEnergyLeft());
