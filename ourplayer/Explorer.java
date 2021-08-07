@@ -33,6 +33,10 @@ public class Explorer extends MyUnit {
   Team enemyTeam = this.uc.getOpponent();
   Team deerTeam = Team.NEUTRAL;
 
+  ArrayList<UnitInfo> currentEnemies = new ArrayList<>();
+
+  int runningAwayCounter = 0;
+
   Explorer(UnitController uc) {
     super(uc);
   }
@@ -40,64 +44,78 @@ public class Explorer extends MyUnit {
   void playRound() {
     decodeMessages();
 
-    // try to send enemy base location smoke signal once a settlement has been created.
-    if (this.settlementCreated) {
-      if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
-        int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
-        this.uc.makeSmokeSignal(signal);
-        this.uc.println(
-            "enemy base smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
-        this.sentSignal = true;
-      }
-    }
-
-    // try to send resource location smoke signal (at most every 30 rounds)
-    if (this.uc.getRound() % 30 == 0 && this.uc.getRound() > 100) {
-      if (this.newResources.size() > 0) {
-        if (this.uc.canMakeSmokeSignal()) {
-          int signal = this.encodeResourceMessage(this.newResources.remove(0));
-          this.uc.makeSmokeSignal(signal);
-          this.uc.println(
-              "resource smoke signal fired on round " + this.uc.getRound() + ". Signal: " + signal);
-        }
-      }
-    }
-
-    // Try to send army size smoke signal (at most every 49 rounds).
-    if (this.uc.getRound() % 49 == 0) {
-      if (this.uc.canMakeSmokeSignal()) {
-        if (!this.seenEnemies.isEmpty()) {
-          int enemyArmySize = this.seenEnemies.size();
-          this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
-          this.uc.println(
-              "Enemy army size smoke signal fired on round "
-                  + this.uc.getRound()
-                  + ". Enemies: "
-                  + enemyArmySize);
-        }
-      }
-    }
-
-    // try to send water smoke signal
-    if (!this.sentWaterSignal) {
-      if (this.seenWater.size() >= this.waterTileThreshold) {
-        if (uc.canMakeSmokeSignal()) {
-          this.uc.makeSmokeSignal(encodeSmokeSignal(0, BUY_RAFTS, 0));
-          this.sentWaterSignal = true;
-          this.uc.println("Build raft signal fired on round " + this.uc.getRound());
-        }
-      }
-    }
-
-    this.uc.println("Energy left after signals: " + this.uc.getEnergyLeft());
-
-    // light torch
-    this.keepTorchLit();
-
     // count enemies
     this.countEnemies();
 
     this.uc.println("Energy left after counting enemies: " + this.uc.getEnergyLeft());
+
+    // only send signals if in a safe place
+    if (this.currentEnemies.size() == 0) {
+      // try to send enemy base location smoke signal once a settlement has been created.
+      if (this.settlementCreated) {
+        if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
+          int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
+          this.uc.makeSmokeSignal(signal);
+          this.uc.println(
+              "enemy base smoke signal fired on round "
+                  + this.uc.getRound()
+                  + ". Signal: "
+                  + signal);
+          this.sentSignal = true;
+        }
+      }
+
+      // try to send resource location smoke signal (at most every 30 rounds)
+      if (this.uc.getRound() % 30 == 0 && this.uc.getRound() > 100) {
+        if (this.newResources.size() > 0) {
+          if (this.uc.canMakeSmokeSignal()) {
+            int signal = this.encodeResourceMessage(this.newResources.remove(0));
+            this.uc.makeSmokeSignal(signal);
+            this.uc.println(
+                "resource smoke signal fired on round "
+                    + this.uc.getRound()
+                    + ". Signal: "
+                    + signal);
+          }
+        }
+      }
+
+      // Try to send army size smoke signal (at most every 49 rounds).
+      if (this.uc.getRound() % 49 == 0) {
+        if (this.uc.canMakeSmokeSignal()) {
+          if (!this.seenEnemies.isEmpty()) {
+            int enemyArmySize = this.seenEnemies.size();
+            this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
+            this.uc.println(
+                "Enemy army size smoke signal fired on round "
+                    + this.uc.getRound()
+                    + ". Enemies: "
+                    + enemyArmySize);
+          }
+        }
+      }
+
+      // try to send water smoke signal
+      if (!this.sentWaterSignal) {
+        if (this.seenWater.size() >= this.waterTileThreshold) {
+          if (uc.canMakeSmokeSignal()) {
+            this.uc.makeSmokeSignal(encodeSmokeSignal(0, BUY_RAFTS, 0));
+            this.sentWaterSignal = true;
+            this.uc.println("Build raft signal fired on round " + this.uc.getRound());
+          }
+        }
+      }
+
+      this.uc.println("Energy left after signals: " + this.uc.getEnergyLeft());
+    }
+
+    // light torch
+    this.keepTorchLit();
+
+    //    // count enemies
+    //    this.countEnemies();
+    //
+    //    this.uc.println("Energy left after counting enemies: " + this.uc.getEnergyLeft());
 
     // count water
     if (!this.sentWaterSignal) {
@@ -107,8 +125,15 @@ public class Explorer extends MyUnit {
     this.uc.println("Energy left after counting water: " + this.uc.getEnergyLeft());
 
     // handles movement
-    if (!this.enemyReaction()) {
-      this.betterMove3();
+    if (this.runningAwayCounter == 0) {
+      if (!this.enemyReaction()) {
+        this.betterMove3();
+      }
+    } else {
+      if (this.uc.canMove(this.currentDir)) {
+        this.uc.move(this.currentDir);
+      }
+      this.runningAwayCounter--;
     }
 
     this.uc.println("Energy left after enemy reaction/movement: " + this.uc.getEnergyLeft());
@@ -202,6 +227,7 @@ public class Explorer extends MyUnit {
 
   // determines the direction that will bring the explorer farthest from all previous tiles
   Direction optimalDirection() {
+    this.uc.println("Energy left before optimal calculation: " + this.uc.getEnergyLeft());
     Direction go = this.currentDir;
     double score = 0;
     double tempScore = 0;
@@ -218,6 +244,7 @@ public class Explorer extends MyUnit {
       }
       tempScore = 0;
     }
+    this.uc.println("Energy left after optimal calculation: " + this.uc.getEnergyLeft());
     return go;
   }
 
@@ -284,13 +311,20 @@ public class Explorer extends MyUnit {
   /** @return true if there are dangerous enemies, false otherwise */
   boolean enemyReaction() {
     boolean react = false;
-    UnitInfo[] enemies = this.uc.senseUnits(this.uc.getOpponent());
-    for (UnitInfo info : enemies) {
+    for (UnitInfo info : this.currentEnemies) {
       // if the enemies are hostile and explorer is in range
       int attackRange = info.getType().attackRange;
-      if (info.getAttack() > 0
-          && (info.getLocation().distanceSquared(this.uc.getLocation()) <= attackRange + 1)) {
-        this.runAway(this.uc.getLocation().directionTo(info.getLocation()));
+      Location myLoc = this.uc.getLocation();
+      Location enemyLoc = info.getLocation();
+      this.uc.println(
+          "Unit attack: "
+              + info.getAttack()
+              + ", Unit distance: "
+              + myLoc.distanceSquared(enemyLoc)
+              + " Unit attack range: "
+              + info.getType().attackRange);
+      if (info.getAttack() > 0 && (enemyLoc.distanceSquared(myLoc) <= attackRange + 10)) {
+        this.runAway(myLoc.directionTo(enemyLoc));
         react = true;
         break;
       }
@@ -299,22 +333,45 @@ public class Explorer extends MyUnit {
   }
 
   void runAway(Direction enemy) {
-    if (this.baseFound) {
-      Direction optimal = enemy.opposite();
-      this.currentDir = optimal;
+    this.uc.println("Running away");
+    //    if (this.baseFound) {
+    //      //      Direction optimal = enemy.opposite();
+    //      //      this.currentDir = optimal;
+    //      this.currentDir = this.currentDir.opposite();
+    //    } else {
+    //      this.currentDir = this.currentDir.rotateRight().rotateRight();
+    //    }
+    //    this.betterMove3();
+    this.runningAwayCounter = 3;
+    Direction opposite = this.currentDir.opposite();
+    if (this.uc.canMove(opposite)) {
+      this.uc.move(opposite);
+      this.currentDir = opposite;
+    } else if (this.uc.canMove(opposite.rotateRight())) {
+      this.uc.move(opposite.rotateRight());
+      this.currentDir = opposite.rotateRight();
+    } else if (this.uc.canMove(opposite.rotateLeft())) {
+      this.uc.move(opposite.rotateLeft());
+      this.currentDir = opposite.rotateLeft();
+    } else {
+      this.currentDir = opposite;
     }
-    this.betterMove3();
   }
 
   void countEnemies() {
+    this.currentEnemies.clear();
     for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
+      // records all current viewable enemies
+      this.currentEnemies.add(enemyInfo);
+
       if (!this.seenEnemies.contains(enemyInfo.getID())
           && (enemyInfo.getType() == UnitType.AXEMAN
               || enemyInfo.getType() == UnitType.SPEARMAN
-              || enemyInfo.getType() == UnitType.WORKER)) {
+              || enemyInfo.getType() == UnitType.WOLF)) {
         this.seenEnemies.add(enemyInfo.getID());
       }
     }
+    this.uc.println("Enemies sensed: " + this.currentEnemies.size());
   }
 
   void countWater() {

@@ -6,7 +6,7 @@ public class Base extends MyUnit {
 
     int workers = 0;
 
-    int maxWorkers = 10;
+    int maxWorkers = 20;
 
     Base(UnitController uc){
         super(uc);

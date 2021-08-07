@@ -12,24 +12,29 @@ public class Worker extends MyUnit {
     boolean smoke = false;
 
     void playRound(){
-        UnitInfo myInfo = uc.getInfo();
-        if (uc.getRound() > 300 + myInfo.getID()%200 && !smoke){
-            if (uc.canMakeSmokeSignal()){
-                uc.makeSmokeSignal(0);
-                smoke = true;
-            }
-        }
+//        UnitInfo myInfo = uc.getInfo();
+//        if (uc.getRound() > 300 + myInfo.getID()%200 && !smoke){
+//            if (uc.canMakeSmokeSignal()){
+//                uc.makeSmokeSignal(0);
+//                smoke = true;
+//            }
+//        }
         moveRandom();
-        if (!torchLighted && myInfo.getTorchRounds() <= 0){
-            lightTorch();
-        }
-        myInfo = uc.getInfo();
-        if (myInfo.getTorchRounds() < 70){
-            randomThrow();
-        }
-        int[] signals = uc.readSmokeSignals();
-        if (signals.length > 0){
-            uc.drawPointDebug(uc.getLocation(), 0, 0, 0);
+//        if (!torchLighted && myInfo.getTorchRounds() <= 0){
+//            lightTorch();
+//        }
+//        myInfo = uc.getInfo();
+//        if (myInfo.getTorchRounds() < 70){
+//            randomThrow();
+//        }
+//        int[] signals = uc.readSmokeSignals();
+//        if (signals.length > 0){
+//            uc.drawPointDebug(uc.getLocation(), 0, 0, 0);
+//        }
+        for (UnitInfo info : this.uc.senseUnits(this.uc.getOpponent())) {
+            if (this.uc.canAttack(info.getLocation())) {
+                this.uc.attack(info.getLocation());
+            }
         }
     }
 }
