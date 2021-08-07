@@ -40,7 +40,6 @@ public class Base extends MyUnit {
             earlyGameCheck();
         }
         playDefense();
-        countEnemies();
         spawnTroops();
         decodeMessages();
         researchTech(); // TODO change research path based on different states like "normal", "water", etc.
@@ -71,29 +70,6 @@ public class Base extends MyUnit {
         for (UnitInfo enemy : shootable_enemies) {
             if (uc.canAttack()) {
                 uc.attack(enemy.getLocation());
-            }
-        }
-    }
-
-    void countEnemies() {
-        for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
-            if (!this.seenEnemies.contains(enemyInfo.getID()) && (enemyInfo.getType() == UnitType.AXEMAN || enemyInfo.getType() == UnitType.SPEARMAN)) {
-                this.enemyArmySize++;
-                this.seenEnemies.add(enemyInfo.getID());
-                newEnemiesSeen = true;
-            }
-        }
-
-        // Try to send army size smoke signal every round new enemies appear in range.
-        if (newEnemiesSeen) {
-            if (this.uc.canMakeSmokeSignal()) {
-                this.uc.makeSmokeSignal(encodeSmokeSignal(enemyArmySize, ENEMY_ARMY_COUNT_REPORT, 0));
-                this.uc.println(
-                        "Enemy army size smoke signal fired on round "
-                                + this.uc.getRound()
-                                + ". Enemies: "
-                                + this.enemyArmySize);
-                newEnemiesSeen = false;
             }
         }
     }
