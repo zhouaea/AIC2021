@@ -15,7 +15,7 @@ public abstract class MyUnit {
     final int BUY_RAFTS = 6;
     final int SETTLEMENT_CREATED = 7;
     final int ENEMY_AXEMAN = 8;
-    final int ENEMY_SPEARMAN=  9;
+    final int ENEMY_SPEARMAN = 9;
     final int ENEMY_WOLF = 10;
     final int ENEMY_SETTLEMENT = 11;
     final int ENEMY_BARRACKS = 12;
@@ -34,17 +34,16 @@ public abstract class MyUnit {
 
     Location enemyBaseLocation = null;
 
-
-    MyUnit(UnitController uc){
+    MyUnit(UnitController uc) {
         this.uc = uc;
     }
 
     abstract void playRound();
 
-    boolean spawnRandom(UnitType t){
+    boolean spawnRandom(UnitType t) {
         Location currentLocation = uc.getLocation();
-        for (Direction dir : dirs){
-            if (uc.canSpawn(t, dir) && isSafeToMove(currentLocation.add(dir))){
+        for (Direction dir : dirs) {
+            if (uc.canSpawn(t, dir) && isSafeToMove(currentLocation.add(dir))) {
                 uc.spawn(t, dir);
                 return true;
             }
@@ -52,11 +51,11 @@ public abstract class MyUnit {
         return false;
     }
 
-    boolean moveRandom(){
+    boolean moveRandom() {
         int tries = 10;
-        while (uc.canMove() && tries-- > 0){
-            int random = (int)(uc.getRandomDouble()*8);
-            if (uc.canMove(dirs[random])){
+        while (uc.canMove() && tries-- > 0) {
+            int random = (int) (uc.getRandomDouble() * 8);
+            if (uc.canMove(dirs[random])) {
                 uc.move(dirs[random]);
                 return true;
             }
@@ -64,18 +63,18 @@ public abstract class MyUnit {
         return false;
     }
 
-    boolean lightTorch(){
-        if (uc.canLightTorch()){
+    boolean lightTorch() {
+        if (uc.canLightTorch()) {
             uc.lightTorch();
             return true;
         }
         return false;
     }
 
-    boolean randomThrow(){
+    boolean randomThrow() {
         Location[] locs = uc.getVisibleLocations(uc.getType().getTorchThrowRange(), false);
-        int index = (int)(uc.getRandomDouble()*locs.length);
-        if (uc.canThrowTorch(locs[index])){
+        int index = (int) (uc.getRandomDouble() * locs.length);
+        if (uc.canThrowTorch(locs[index])) {
             uc.throwTorch(locs[index]);
             return true;
         }
@@ -97,8 +96,9 @@ public abstract class MyUnit {
 
     /**
      * Send a location of interest and its contents.
-     * @param location the location with a point of interest
-     * @param unitCode an 4 bit integer (from 0-15) that corresponds to a unit in the game. See constants in the MyUnit class.
+     *
+     * @param location   the location with a point of interest
+     * @param unitCode   an 4 bit integer (from 0-15) that corresponds to a unit in the game. See constants in the MyUnit class.
      * @param unitAmount a 4 bit integer that signifies how many units there are. If the number is 15, it could
      *                   mean 15+ of that unit. If number is greater than 100, we will divide the number by 100 to stay
      *                   within the bit limit.
@@ -107,7 +107,7 @@ public abstract class MyUnit {
      * bit 14-17 are for the unit code
      * bits 18-21 are for the unit amount
      * bits 22-31 are for the identifier (leaving a a 1 / 2^10 chance of mistaking an enemy smoke signal for an
-     *  ally smoke signal, or a 0.09% chance that an enemy smoke signal is ours)
+     * ally smoke signal, or a 0.09% chance that an enemy smoke signal is ours)
      */
     int encodeSmokeSignal(Location location, int unitCode, int unitAmount) {
         // Divide amount by 100 if unit is a resource.
@@ -158,8 +158,9 @@ public abstract class MyUnit {
 
     /**
      * Decode a smoke signal.
+     *
      * @param currentLocation the location of the decoding unit
-     * @param codedMessage 32 bit integer that came from the smoke signal
+     * @param codedMessage    32 bit integer that came from the smoke signal
      * @return The contents of the message if we are 99% sure the message came from our team. Otherwise, null.
      */
     DecodedMessage decodeSmokeSignal(Location currentLocation, int codedMessage) {
@@ -256,7 +257,9 @@ public abstract class MyUnit {
         return bestLocationSoFar;
     }
 
-    /** Left handed bug that attempts to stay in a straight line, avoiding attacks if it can.
+    /**
+     * Left handed bug that attempts to stay in a straight line, avoiding attacks if it can.
+     *
      * @param currentLocation
      * @param destination
      * @return true if at location, false if still moving towards it.
@@ -299,7 +302,8 @@ public abstract class MyUnit {
         return false;
     }
 
-    /** Keep bot's left side on obstacle.
+    /**
+     * Keep bot's left side on obstacle.
      */
     private void leftBug() {
         uc.println("navigate around obstacle");
@@ -309,8 +313,7 @@ public abstract class MyUnit {
             if (uc.canMove(bugDirection) && isSafeToMove(uc.getLocation().add(bugDirection))) {
                 uc.move(bugDirection);
                 break;
-            }
-            else
+            } else
                 bugDirection = bugDirection.rotateRight();
         }
 
@@ -320,6 +323,10 @@ public abstract class MyUnit {
     }
 
     boolean destinationIsReached(Location currentLocation, Location destination, boolean adjacentDestination) {
+        if (currentLocation == null || destination == null) {
+            return false;
+        }
+
         // If pathfinding to a location adjacent to the destination, set the destination to be at an adjacent tile.
         if (adjacentDestination) {
             // If unit is on the destination instead of being adjacent to it, move to an adjacent tile, and the
@@ -332,7 +339,7 @@ public abstract class MyUnit {
                         return true;
                     }
                 }
-            // Otherwise, the destination is reached when the unit steps on a tile adjacent to the destination.
+                // Otherwise, the destination is reached when the unit steps on a tile adjacent to the destination.
             } else {
                 for (Direction dir : dirs) {
                     Location alternative = destination.add(dir);
@@ -391,17 +398,17 @@ public abstract class MyUnit {
             if (dropTorch())
                 if (uc.canLightTorch()) {
                     uc.lightTorch();
-                }
-                else
+                } else
                     uc.println("SOMEHOW TORCH CAN NOT BE LIT");
         }
     }
 
     /**
      * Attempt to throw the unit's torch at an adjacent tile.
+     *
      * @return whether or not unit was able to throw a torch on an adjacent tile
      */
-    private boolean dropTorch() {
+    boolean dropTorch() {
         Location current_location = uc.getLocation();
         int temp_x = current_location.x;
         int temp_y = current_location.y;
@@ -434,7 +441,7 @@ public abstract class MyUnit {
         }
 
         // Drop torch to the left.
-        temp_x -=2;
+        temp_x -= 2;
         if (tryToThrowTorch(new Location(temp_x, temp_y))) {
             return true;
         }
@@ -450,10 +457,11 @@ public abstract class MyUnit {
 
     /**
      * Helper function for drop torch.
+     *
      * @param location to throw torch
      * @return whether or not torch was able to be thrown
      */
-    private boolean tryToThrowTorch(Location location) {
+    boolean tryToThrowTorch(Location location) {
         if (uc.canThrowTorch(location)) {
             uc.throwTorch(location);
             return true;

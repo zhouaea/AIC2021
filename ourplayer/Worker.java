@@ -13,6 +13,8 @@ public class Worker extends MyUnit {
     Team enemy = uc.getOpponent();
     Team deerTeam = Team.NEUTRAL;
 
+    boolean raftsInvested = false;
+
     ArrayList<ResourceInfo> found_resources = new ArrayList<>(); //ArrayList instead of queue in case we want to prioritize certain resources
     ArrayList<ResourceInfo> low_priority_resources = new ArrayList<>();
     ArrayList<ResourceInfo> messagesToSend = new ArrayList<>();
@@ -20,6 +22,8 @@ public class Worker extends MyUnit {
     final int MAX_RESOURCES_TO_REMEMBER = 5;
 
     final int RESOURCE_THRESHOLD_FOR_SETTLEMENT = 300;
+
+    int roundsSinceResourcesFound = 0;
 
     final int MAX_BUILDINGS_PLACED = 20;
     boolean hasCalculatedBuildingLocations = false;
@@ -31,6 +35,8 @@ public class Worker extends MyUnit {
 
     boolean isHunting = false;
     Location currentDeerLocation;
+
+    boolean settlementBuilt = false;
 
     boolean isMining = false;
 
@@ -45,8 +51,10 @@ public class Worker extends MyUnit {
     Direction currentDir = dirs[randomDirectionIndex];
 
     void playRound(){
-        if (uc.getInfo().getID() == 4543 && uc.getRound() == 192) {
-            uc.println("hello");
+        // Reset pathfinding when rafts is bought since the terrain has changed.
+        if (!raftsInvested && uc.hasResearched(Technology.RAFTS, team)) {
+            closestLocation = null;
+            raftsInvested = true;
         }
 
         // TODO come up with faster way for builder to place buildings along lattice structure
@@ -56,7 +64,6 @@ public class Worker extends MyUnit {
             rememberDepositLocation();
         }
 
-        senseEnemies(); // All bytecode goes to running from enemies to base or fighting as a first priority.
         decodeMessages(); // get locations of resources from other units or a place to build a building from the base
         senseResources(); // add/remove resource locations to/from memory
         senseEnemyWorkers();
@@ -94,8 +101,11 @@ public class Worker extends MyUnit {
     void rememberDepositLocation() {
         UnitInfo[] surroundingUnits = uc.senseUnits(team);
         for (UnitInfo unit : surroundingUnits) {
-            if (unit.getType() == UnitType.BASE || unit.getType() == UnitType.SETTLEMENT) {
+            if (unit.getType() == UnitType.BASE) {
                 depositLocation = unit.getLocation();
+            } else if (unit.getType() == UnitType.SETTLEMENT) {
+                depositLocation = unit.getLocation();
+                settlementBuilt = true;
             }
         }
 
@@ -126,6 +136,8 @@ public class Worker extends MyUnit {
                     low_priority_resources.add(new ResourceInfo(Resource.FOOD, message.unitAmount, message.location));
                 else if (message.unitCode == ENEMY_BASE)
                     enemyBaseLocation = message.location;
+                else if (message.unitCode == SETTLEMENT_CREATED)
+                    settlementBuilt = true;
                 else if (message.unitCode == ASSIGN_BARRACK_BUILDER) {
                     if (uc.getInfo().getID() == message.unitId) {
                         isBarrackBuilding = true;
@@ -150,6 +162,13 @@ public class Worker extends MyUnit {
         // resources, save it as a message to send.
         int resourceInArea = 0;
         ResourceInfo[] resources = uc.senseResources();
+        if (resources.length == 0) {
+             roundsSinceResourcesFound++;
+        } else {
+            roundsSinceResourcesFound = 0;
+        }
+
+
         for (ResourceInfo resource : resources) {
             resourceInArea += resource.amount;
             if (found_resources.size() < MAX_RESOURCES_TO_REMEMBER) {
@@ -208,6 +227,20 @@ public class Worker extends MyUnit {
         return false;
     }
 
+    private void updateDeposit() {
+        UnitInfo[] unitsNearby = uc.senseUnits();
+        for (UnitInfo unit : unitsNearby) {
+            if (unit.getTeam() == team) {
+                if (unit.getType() == UnitType.SETTLEMENT) {
+                    if (uc.getLocation().distanceSquared(unit.getLocation()) < uc.getLocation().distanceSquared(depositLocation)) {
+                        depositLocation = unit.getLocation();
+                        settlementBuilt = true;
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Randomly place settlement, prioritizing a location with no resources on it.
      */
@@ -260,19 +293,6 @@ public class Worker extends MyUnit {
         return loc1.x == loc2.x && loc1.y == loc2.y;
     }
 
-    private void updateDeposit() {
-        UnitInfo[] unitsNearby = uc.senseUnits();
-        for (UnitInfo unit : unitsNearby) {
-            if (unit.getTeam() == team) {
-                if (unit.getType() == UnitType.SETTLEMENT) {
-                    if (uc.getLocation().distanceSquared(unit.getLocation()) < uc.getLocation().distanceSquared(depositLocation)) {
-                        depositLocation = unit.getLocation();
-                    }
-                }
-            }
-        }
-    }
-
     private boolean checkForDeposit() {
         UnitInfo[] unitsNearby = uc.senseUnits();
         for (UnitInfo unit : unitsNearby) {
@@ -294,7 +314,7 @@ public class Worker extends MyUnit {
         for (UnitInfo enemyUnit : enemyUnits) {
             if (enemyUnit.getTeam() == enemy) {
                 // As long as workers can win the engagement, fight the units.
-                if (enemyUnit.getType() != UnitType.AXEMAN && enemyUnit.getType() != UnitType.WOLF) {
+                if (enemyUnit.getType() != UnitType.AXEMAN && enemyUnit.getType() != UnitType.WOLF && enemyUnit.getType() != UnitType.BASE) {
                     currentEnemyWorkerLocation = enemyUnit.getLocation();
                     isFightingEnemyWorkers = true;
                     return;
@@ -321,6 +341,27 @@ public class Worker extends MyUnit {
             if (isHunting) {
                 isHunting = false; // Deer was killed
                 closestLocation = null; // Reset pathfinding manually after worker is done chasing deer
+            }
+        }
+    }
+
+    void keepTorchLit() {
+        int torchRounds = uc.getInfo().getTorchRounds();
+        // Only light torches if resources are continued to be found.
+        if (roundsSinceResourcesFound <= 50) {
+            // Light torch when spawned.
+            if (torchRounds == 0) {
+                if (uc.canLightTorch()) {
+                    uc.lightTorch();
+                }
+                // After initial torch light, throw torch on ground and light a new one when the torch is almost depleted.
+            } else if (torchRounds <= 5) {
+                if (dropTorch()) {
+                    if (uc.canLightTorch())
+                        uc.lightTorch();
+                    else
+                        uc.println("SOMEHOW TORCH CAN NOT BE LIT");
+                }
             }
         }
     }
