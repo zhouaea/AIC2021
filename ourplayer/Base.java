@@ -39,6 +39,12 @@ public class Base extends MyUnit {
         if (uc.getRound() == 0) {
             earlyGameCheck();
         }
+
+        // Let early batch of workers know where the enemy base is, if it is nearby.
+        if (uc.getRound() == 10) {
+            broadcastEnemyBase();
+        }
+
         playDefense();
         spawnTroops();
         decodeMessages();
@@ -52,6 +58,7 @@ public class Base extends MyUnit {
 
     void earlyGameCheck() {
         checkForWater();
+        checkForEnemyBase();
     }
 
     void checkForWater() {
@@ -61,6 +68,20 @@ public class Base extends MyUnit {
                 waterMode = true;
                 uc.println("water mode activated");
             }
+        }
+    }
+
+    void checkForEnemyBase() {
+        for (UnitInfo unit : uc.senseUnits(uc.getOpponent())) {
+            if (unit.getType() == UnitType.BASE) {
+                enemyBaseLocation = unit.getLocation();
+            }
+        }
+    }
+
+    void broadcastEnemyBase() {
+        if (uc.canMakeSmokeSignal()) {
+            uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
         }
     }
 
@@ -251,32 +272,6 @@ public class Base extends MyUnit {
                 makeBuilder();
                 uc.println("making builder");
             }
-        }
-    }
-
-    /**
-     * Spawn a worker, get its id, and tell it to enter building mode.
-     */
-    private void makeBarrackBuilder() {
-        // Cannot proceed unless worker is built.
-        if (!spawnRandom(UnitType.WORKER)) {
-            return;
-        }
-
-        UnitInfo[] allyUnits = uc.senseUnits(2, team);
-        for (UnitInfo unit : allyUnits) {
-            if (unit.getType() == UnitType.WORKER) {
-                barrackBuilderId = unit.getID();
-                break;
-            }
-        }
-
-        // Builder is not assigned until smoke signal is sent.
-        if (uc.canMakeSmokeSignal()) {
-            uc.println(barrackBuilderId);
-            uc.makeSmokeSignal(encodeSmokeSignal(barrackBuilderId, ASSIGN_BARRACK_BUILDER, 1));
-            hasAssignedWorkerAsBarrackBuilder = true;
-            uc.println("worker is now a builder");
         }
     }
 
