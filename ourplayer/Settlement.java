@@ -10,7 +10,7 @@ public class Settlement extends MyUnit {
     boolean hasAnnouncedCreation = false;
 
     boolean waterMode = false;
-    final int WATER_TILE_THRESHOLD = 1;
+    final int WATER_TILE_THRESHOLD = 4;
 
     final int ResourcesPerWorkerSpawnThreshold = 400;
 
