@@ -94,11 +94,6 @@ public class Explorer extends MyUnit {
         // light torch
         this.keepTorchLit();
 
-        // count enemies
-        this.countEnemies();
-
-        this.uc.println("Energy left after counting enemies: " + this.uc.getEnergyLeft());
-
         // count water
         if (!this.sentWaterSignal) {
             this.countWater();
@@ -304,17 +299,6 @@ public class Explorer extends MyUnit {
             this.currentDir = optimal;
         }
         this.betterMove3();
-    }
-
-    void countEnemies() {
-        for (UnitInfo enemyInfo : this.uc.senseUnits(this.enemyTeam)) {
-            if (!this.seenEnemies.contains(enemyInfo.getID())
-                    && (enemyInfo.getType() == UnitType.AXEMAN
-                    || enemyInfo.getType() == UnitType.SPEARMAN
-                    || enemyInfo.getType() == UnitType.WORKER)) {
-                this.seenEnemies.add(enemyInfo.getID());
-            }
-        }
     }
 
     void countWater() {
