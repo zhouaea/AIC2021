@@ -51,51 +51,54 @@ public class Worker extends MyUnit {
     Direction currentDir = dirs[randomDirectionIndex];
 
     void playRound(){
-        // Reset pathfinding when rafts is bought since the terrain has changed.
-        if (!raftsInvested && uc.hasResearched(Technology.RAFTS, team)) {
-            closestLocation = null;
-            raftsInvested = true;
-        }
-
-        // TODO come up with faster way for builder to place buildings along lattice structure
-        // TODO Don't add resources in the range of the enemy base.
-        // If just created, store team's base location.
-        if (!knowsPlaceToDeposit) {
-            rememberDepositLocation();
-        }
-
-        decodeMessages(); // get locations of resources from other units or a place to build a building from the base
-        senseResources(); // add/remove resource locations to/from memory
-        senseEnemyWorkers();
-        senseDeer(); //  check local area for deer to hunt
-        keepTorchLit();
-
-        if (isBarrackBuilding) {
-            spawnBarrack();
-        } else if (isBuilding) {
+        if (isBuilding) {
+            if (!knowsPlaceToDeposit) {
+                rememberDepositLocation();
+            }
+            decodeMessages();
             spawnBuildings(); // once jobs is unlocked, spawn 20 buildings max
             uc.println("building");
-        }
-        else if (isFightingEnemyWorkers) {
-            fightEnemyWorkers();
-            uc.println("fighting enemy workers");
-        }
-        // Hunting takes precedence over depositing (can kill deer on the way).
-        else if (isHunting) {
-            hunt();
-            uc.println("hunt");
-        } else if (isDepositing) {
-            deposit();
-            uc.println("deposit");
-        } else if (isMining) {
-            mine();
-            uc.println("mine");
         } else {
-            moveToResource(); // movement options
-            uc.println("movetoresource");
-        }
+            // Reset pathfinding when rafts is bought since the terrain has changed.
+            if (!raftsInvested && uc.hasResearched(Technology.RAFTS, team)) {
+                closestLocation = null;
+                raftsInvested = true;
+            }
 
-        uc.println(uc.getEnergyLeft());
+            // TODO come up with faster way for builder to place buildings along lattice structure
+            // TODO Don't add resources in the range of the enemy base.
+            // If just created, store team's base location.
+            if (!knowsPlaceToDeposit) {
+                rememberDepositLocation();
+            }
+
+            decodeMessages(); // get locations of resources from other units or a place to build a building from the base
+            senseResources(); // add/remove resource locations to/from memory
+            senseEnemyWorkers();
+            senseDeer(); //  check local area for deer to hunt
+            keepTorchLit();
+
+            if (isFightingEnemyWorkers) {
+                fightEnemyWorkers();
+                uc.println("fighting enemy workers");
+            }
+            // Hunting takes precedence over depositing (can kill deer on the way).
+            else if (isHunting) {
+                hunt();
+                uc.println("hunt");
+            } else if (isDepositing) {
+                deposit();
+                uc.println("deposit");
+            } else if (isMining) {
+                mine();
+                uc.println("mine");
+            } else {
+                moveToResource(); // movement options
+                uc.println("movetoresource");
+            }
+
+            uc.println(uc.getEnergyLeft());
+        }
     }
 
     void rememberDepositLocation() {
@@ -426,6 +429,10 @@ public class Worker extends MyUnit {
             }
 
             if (uc.hasMountain(buildingLocation) || uc.hasWater(buildingLocation)) {
+                return false;
+            }
+
+            if (!isSafeToMove(buildingLocation)) {
                 return false;
             }
 
