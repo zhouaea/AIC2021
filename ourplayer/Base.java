@@ -21,6 +21,10 @@ public class Base extends MyUnit {
     int enemyArmySize = 0;
     HashSet<Integer> seenEnemies = new HashSet<>();
 
+    int tierZeroResearch = 0;
+    int tierOneResearch = 0;
+    int tierTwoResearch = 0;
+
     boolean hasAssignedWorkerAsBarrackBuilder = false;
     int barrackBuilderId = 0;
     boolean hasAssignedWorkerAsBuilder = false;
@@ -113,9 +117,6 @@ public class Base extends MyUnit {
         if (uc.getTechLevel(team) == 0)
             researchTechLevel0();
         else {
-            if (workers < 1)
-                spawnRandom(UnitType.WORKER);
-
             if (uc.getTechLevel(team) == 1)
                 researchTechLevel1();
             else if (uc.getTechLevel(team) == 2)
@@ -128,62 +129,113 @@ public class Base extends MyUnit {
 
     private void researchTechLevel0() {
         if (waterMode) {
-            if (uc.canResearchTechnology(Technology.RAFTS)) {
+            if (uc.canResearchTechnology(Technology.RAFTS) && uc.getTechLevel(team) == 0) {
                 uc.researchTechnology(Technology.RAFTS);
                 return;
             }
 
-            if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.RAFTS, team)) {
-                uc.researchTechnology(Technology.MILITARY_TRAINING);
-                return;
-            }
-            if (uc.canResearchTechnology(Technology.UTENSILS) && uc.hasResearched(Technology.RAFTS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+            if (uc.canResearchTechnology(Technology.UTENSILS) && uc.hasResearched(Technology.RAFTS, team) && uc.getTechLevel(team) == 0) {
                 uc.researchTechnology(Technology.UTENSILS);
+            }
+
+            if (uc.canResearchTechnology(Technology.COIN) && uc.hasResearched(Technology.RAFTS, team) && uc.getTechLevel(team) == 0) {
+                uc.researchTechnology(Technology.COIN);
+            }
+
+            if (uc.canResearchTechnology(Technology.ROCK_ART) && uc.hasResearched(Technology.RAFTS, team) && uc.getTechLevel(team) == 0) {
+                uc.researchTechnology(Technology.ROCK_ART);
+            }
+
+            if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.RAFTS, team) && uc.getTechLevel(team) == 0) {
+                uc.researchTechnology(Technology.BOXES);
             }
         } else {
-            if (uc.canResearchTechnology(Technology.UTENSILS)) {
+            if (uc.canResearchTechnology(Technology.UTENSILS) && uc.getTechLevel(team) == 0) {
                 uc.researchTechnology(Technology.UTENSILS);
-                return;
             }
-            if (uc.canResearchTechnology(Technology.MILITARY_TRAINING) && uc.hasResearched(Technology.UTENSILS, team)) {
-                uc.researchTechnology(Technology.MILITARY_TRAINING);
-                return;
+
+            if (uc.canResearchTechnology(Technology.COIN) && uc.getTechLevel(team) == 0) {
+                uc.researchTechnology(Technology.COIN);
             }
-            if (uc.canResearchTechnology(Technology.BOXES) && uc.hasResearched(Technology.UTENSILS, team) && uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
+
+            if (uc.canResearchTechnology(Technology.ROCK_ART) && uc.getTechLevel(team) == 0) {
+                uc.researchTechnology(Technology.ROCK_ART);
+            }
+
+            if (uc.canResearchTechnology(Technology.BOXES) && uc.getTechLevel(team) == 0) {
                 uc.researchTechnology(Technology.BOXES);
             }
         }
     }
 
     private void researchTechLevel1() {
-        if (uc.canResearchTechnology(Technology.TACTICS)) {
-            uc.researchTechnology(Technology.TACTICS);
-            return;
-        }
-
-        if (uc.canResearchTechnology(Technology.JOBS) && uc.hasResearched(Technology.TACTICS, team)) {
+        if (uc.canResearchTechnology(Technology.JOBS)) {
             uc.researchTechnology(Technology.JOBS);
-            return;
         }
 
-        if (uc.canResearchTechnology(Technology.COOKING) && uc.hasResearched(Technology.TACTICS, team) && uc.hasResearched(Technology.JOBS, team)) {
+        if (uc.canResearchTechnology(Technology.TACTICS) && uc.hasResearched(Technology.JOBS, team ) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.TACTICS);
+        }
+
+        if (uc.canResearchTechnology(Technology.VOCABULARY) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.VOCABULARY);
+        }
+
+        if (uc.canResearchTechnology(Technology.OIL) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.OIL);
+        }
+
+        if (uc.canResearchTechnology(Technology.HUTS) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.HUTS);
+        }
+
+        if (uc.canResearchTechnology(Technology.COOKING) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
             uc.researchTechnology(Technology.COOKING);
+        }
+
+        if (uc.canResearchTechnology(Technology.EUGENICS) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.EUGENICS);
+        }
+
+        if (uc.canResearchTechnology(Technology.NAVIGATION) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.NAVIGATION);
+        }
+
+        if (uc.canResearchTechnology(Technology.SHARPENERS) && uc.hasResearched(Technology.JOBS, team) && uc.getTechLevel(team) == 1) {
+            uc.researchTechnology(Technology.SHARPENERS);
         }
     }
 
     private void researchTechLevel2() {
-        if (uc.canResearchTechnology(Technology.CRYSTALS)) {
+        if (uc.canResearchTechnology(Technology.SCHOOLS) && uc.getTechLevel(team) == 2) {
+            uc.researchTechnology(Technology.SCHOOLS);
+            return;
+        }
+
+        if (uc.canResearchTechnology(Technology.CRYSTALS) && uc.getTechLevel(team) == 2) {
             uc.researchTechnology(Technology.CRYSTALS);
             return;
         }
 
-        if (uc.canResearchTechnology(Technology.COMBUSTION)) {
+        if (uc.canResearchTechnology(Technology.COMBUSTION) && uc.getTechLevel(team) == 2) {
             uc.researchTechnology(Technology.COMBUSTION);
             return;
         }
 
-        if (uc.canResearchTechnology(Technology.POISON)) {
+        if (uc.canResearchTechnology(Technology.POISON) && uc.getTechLevel(team) == 2) {
             uc.researchTechnology(Technology.POISON);
+        }
+
+        if (uc.canResearchTechnology(Technology.FLINT) && uc.getTechLevel(team) == 2) {
+            uc.researchTechnology(Technology.FLINT);
+        }
+
+        if (uc.canResearchTechnology(Technology.HOUSES) && uc.getTechLevel(team) == 2) {
+            uc.researchTechnology(Technology.HOUSES);
+        }
+
+        if (uc.canResearchTechnology(Technology.EXPERTISE) && uc.getTechLevel(team) == 2) {
+            uc.researchTechnology(Technology.EXPERTISE);
         }
     }
 
@@ -218,15 +270,10 @@ public class Base extends MyUnit {
 
 
     void makeBuilders() {
-        if (uc.hasResearched(Technology.MILITARY_TRAINING, team)) {
-            if (!hasAssignedWorkerAsBarrackBuilder) {
-                makeBarrackBuilder();
-            }
-        }
-
         if (uc.hasResearched(Technology.JOBS, team)) {
             if (!hasAssignedWorkerAsBuilder) {
                 makeBuilder();
+                uc.println("making builder");
             }
         }
     }
