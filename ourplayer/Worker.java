@@ -629,7 +629,12 @@ public class Worker extends MyUnit {
             if (this.uc.canMove(this.currentDir)) {
                 this.uc.move(this.currentDir);
             } else {
-                this.currentDir = this.currentDir.rotateRight().rotateRight();
+                int leftOrRight = (int) (uc.getRandomDouble() * 2);
+                if (leftOrRight == 0) {
+                    this.currentDir = this.currentDir.rotateLeft().rotateLeft();
+                } else {
+                    this.currentDir = this.currentDir.rotateRight().rotateRight();
+                }
             }
         }
     }
