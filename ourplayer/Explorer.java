@@ -7,7 +7,6 @@ import aic2021.user.*;
 
 public class Explorer extends MyUnit {
 
-    boolean initDirSet = false;
     boolean sentSignal = false;
     boolean baseFound = false;
     boolean sentWaterSignal = false;
@@ -16,7 +15,7 @@ public class Explorer extends MyUnit {
     final int visitedID = 71920;
     final int waterTileThreshold = 5;
 
-    Direction currentDir;
+    Direction currentDir = Direction.NORTH;
 
     Location enemyBaseLocation;
 
@@ -41,14 +40,8 @@ public class Explorer extends MyUnit {
     void playRound() {
         decodeMessages();
 
-        // sets initial direction at spawn
-        if (!this.initDirSet) {
-            this.currentDir = Direction.NORTH;
-            this.initDirSet = true;
-        }
-
         // try to send enemy base location smoke signal once a settlement has been created.
-        if (settlementCreated) {
+        if (this.settlementCreated) {
             if (this.uc.canMakeSmokeSignal() && this.enemyBaseLocation != null && !this.sentSignal) {
                 int signal = encodeSmokeSignal(this.enemyBaseLocation, 0, 1);
                 this.uc.makeSmokeSignal(signal);
@@ -88,16 +81,15 @@ public class Explorer extends MyUnit {
         // try to send water smoke signal
         if (!this.sentWaterSignal) {
             if (this.seenWater.size() >= this.waterTileThreshold) {
-                int signal = 122500;
                 if (uc.canMakeSmokeSignal()) {
                     this.uc.makeSmokeSignal(encodeSmokeSignal(0, BUY_RAFTS, 0));
                     this.sentWaterSignal = true;
-                    this.uc.println(
-                            "Build raft signal fired on round "
-                                    + this.uc.getRound());
+                    this.uc.println("Build raft signal fired on round " + this.uc.getRound());
                 }
             }
         }
+
+        this.uc.println("Energy left after signals: " + this.uc.getEnergyLeft());
 
         // light torch
         this.keepTorchLit();
@@ -105,26 +97,40 @@ public class Explorer extends MyUnit {
         // count enemies
         this.countEnemies();
 
+        this.uc.println("Energy left after counting enemies: " + this.uc.getEnergyLeft());
+
         // count water
-        this.countWater();
+        if (!this.sentWaterSignal) {
+            this.countWater();
+        }
+
+        this.uc.println("Energy left after counting water: " + this.uc.getEnergyLeft());
 
         // handles movement
         if (!this.enemyReaction()) {
             this.betterMove3();
         }
 
+        this.uc.println("Energy left after enemy reaction/movement: " + this.uc.getEnergyLeft());
+
         // did it find the base?
         if (!this.baseFound) {
             if (this.findBase()) {
                 this.baseFound = true;
-                this.calculateDangerZone();
+                //        this.calculateDangerZone();
             }
         }
+
+        this.uc.println(
+                "Energy left after finding enemy base and calculating danger zone: "
+                        + this.uc.getEnergyLeft());
 
         // look for resources
         if (this.uc.getRound() > 100) {
             this.findResources();
         }
+
+        this.uc.println("Energy left after finding resources (last step): " + this.uc.getEnergyLeft());
     }
 
     void decodeMessages() {
@@ -176,11 +182,22 @@ public class Explorer extends MyUnit {
             }
         }
         // in case explorer is stuck (all surrounding tiles have been visited)
-        if (this.uc.canMove()) {
-            if (this.uc.canMove(this.currentDir)) {
-                this.uc.move(this.currentDir);
+        if (this.uc.canMove(this.currentDir) && this.lastResortValidLocationCheck()) {
+            this.uc.move(this.currentDir);
+        }
+    }
+
+    boolean lastResortValidLocationCheck() {
+        Location loc = this.uc.getLocation().add(this.currentDir);
+        if (uc.hasTrap(loc)) return false;
+
+        // Factor in the attack radius of the enemy base, if its location is known.
+        if (enemyBaseLocation != null) {
+            if (loc.distanceSquared(enemyBaseLocation) <= UnitType.BASE.getAttackRange()) {
+                return false;
             }
         }
+        return true;
     }
 
     // determines the direction that will bring the explorer farthest from all previous tiles
@@ -215,13 +232,17 @@ public class Explorer extends MyUnit {
     }
 
     boolean validLocationCheck(Location l) {
-        if (this.uc.canRead(l)) {
+        if (this.uc.canSenseLocation(l)) {
             if (this.uc.read(l) == this.visitedID) {
                 return false;
             }
+            if (this.uc.hasTrap(l)) {
+                return false;
+            }
         }
-        for (Location loc : this.dangerZone) {
-            if (l.isEqual(loc)) {
+        // Factor in the attack radius of the enemy base, if its location is known.
+        if (this.enemyBaseLocation != null) {
+            if (l.distanceSquared(this.enemyBaseLocation) <= UnitType.BASE.getAttackRange()) {
                 return false;
             }
         }
@@ -240,11 +261,13 @@ public class Explorer extends MyUnit {
 
     // ignores stores with less than 100
     void findResources() {
-        for (ResourceInfo info : this.uc.senseResources()) {
-            Location l = info.location;
-            if (info.amount >= 100 && !this.alreadySeenResourceCheck(l)) {
-                this.newResources.add(info);
-                this.seenResources.add(l);
+        if (this.seenResources.size() < 60) {
+            for (ResourceInfo info : this.uc.senseResources()) {
+                Location l = info.location;
+                if (info.amount >= 100 && !this.alreadySeenResourceCheck(l)) {
+                    this.newResources.add(info);
+                    this.seenResources.add(l);
+                }
             }
         }
     }
@@ -267,7 +290,6 @@ public class Explorer extends MyUnit {
             int attackRange = info.getType().attackRange;
             if (info.getAttack() > 0
                     && (info.getLocation().distanceSquared(this.uc.getLocation()) <= attackRange + 1)) {
-                //        this.sentryMode = false;
                 this.runAway(this.uc.getLocation().directionTo(info.getLocation()));
                 react = true;
                 break;
@@ -280,7 +302,6 @@ public class Explorer extends MyUnit {
         if (this.baseFound) {
             Direction optimal = enemy.opposite();
             this.currentDir = optimal;
-            //      this.visitedID++;
         }
         this.betterMove3();
     }
