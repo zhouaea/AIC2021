@@ -314,11 +314,9 @@ public class Worker extends MyUnit {
         for (UnitInfo enemyUnit : enemyUnits) {
             if (enemyUnit.getTeam() == enemy) {
                 // As long as workers can win the engagement, fight the units.
-                if (enemyUnit.getType() != UnitType.AXEMAN && enemyUnit.getType() != UnitType.WOLF && enemyUnit.getType() != UnitType.BASE) {
-                    currentEnemyWorkerLocation = enemyUnit.getLocation();
-                    isFightingEnemyWorkers = true;
-                    return;
-                }
+                currentEnemyWorkerLocation = enemyUnit.getLocation();
+                isFightingEnemyWorkers = true;
+                return;
             }
         }
 
