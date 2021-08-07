@@ -48,7 +48,7 @@ public class Base extends MyUnit {
         playDefense();
         spawnTroops();
         decodeMessages();
-        researchTech(); // TODO change research path based on different states like "normal", "water", etc.
+        researchTech();
         makeBuilders();
 
 
@@ -80,8 +80,10 @@ public class Base extends MyUnit {
     }
 
     void broadcastEnemyBase() {
-        if (uc.canMakeSmokeSignal()) {
-            uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
+        if (enemyBaseLocation != null) {
+            if (uc.canMakeSmokeSignal()) {
+                uc.makeSmokeSignal(encodeSmokeSignal(enemyBaseLocation, ENEMY_BASE, 1));
+            }
         }
     }
 
