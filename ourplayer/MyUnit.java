@@ -681,6 +681,7 @@ public abstract class MyUnit {
                 Location neighbor = dest.add(dir);
                 if (uc.canSenseLocation(neighbor) && uc.isAccessible(neighbor)) {
                     dest = neighbor;
+                    break;
                 }
             }
         }
